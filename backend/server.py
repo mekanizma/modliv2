@@ -24,6 +24,12 @@ db = client[os.environ.get('DB_NAME', 'test_database')]
 FAL_KEY = os.environ.get('FAL_KEY', '')
 OPENWEATHER_API_KEY = os.environ.get('OPENWEATHER_API_KEY', '')
 
+# CORS origins (production and development)
+ALLOWED_ORIGINS = os.environ.get(
+    'ALLOWED_ORIGINS',
+    'https://modli.mekanizma.com,http://localhost:8081,http://localhost:19006'
+).split(',')
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -219,8 +225,8 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,  # Configured from environment
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

@@ -21,7 +21,7 @@ Bu rehber, Modli uygulamasını production ortamına deploy etmek için adım ad
 - [ ] **VPS/Cloud Server** (DigitalOcean, Hetzner, Linode, vb.)
   - Minimum: 2 CPU, 2GB RAM, 20GB Disk
   - Önerilen: Ubuntu 22.04 LTS
-- [ ] **Domain Name** (örn: modli.com, api.modli.com)
+- [ ] **Domain Name** (örn: modli.mekanizma.com)
 - [ ] **MongoDB Atlas Account** (ücretsiz tier yeterli)
 - [ ] **Supabase Account** (production projesi)
 - [ ] **Apple Developer Account** ($99/yıl - iOS için)
@@ -90,24 +90,24 @@ curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 **Domain DNS Ayarları:**
 ```
 Type: A Record
-Name: api.modli.com (veya @ for root domain)
+Name: modli.mekanizma.com
 Value: YOUR_SERVER_IP
 TTL: 300
 ```
 
 **Coolify'da:**
 1. Application → Domains
-2. `api.modli.com` ekleyin
+2. `modli.mekanizma.com` ekleyin
 3. `Generate Domain` veya manuel girin
 4. `Enable HTTPS` → Let's Encrypt otomatik çalışır
 
-✅ **5-10 dakika içinde:** `https://api.modli.com` hazır!
+✅ **5-10 dakika içinde:** `https://modli.mekanizma.com` hazır!
 
 ### 4. Health Check Test
 
 ```bash
 # API'nin çalıştığını kontrol edin
-curl https://api.modli.com/health
+curl https://modli.mekanizma.com/health
 
 # Beklenen çıktı:
 # {"status":"healthy","timestamp":"2025-12-17T...","services":{...}}
@@ -157,7 +157,7 @@ Bu komut `eas.json` dosyası oluşturur. İçeriğini düzenleyin:
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://api.modli.com",
+        "EXPO_PUBLIC_BACKEND_URL": "https://modli.mekanizma.com",
         "EXPO_PUBLIC_SUPABASE_URL": "https://your-prod.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your_anon_key",
         "EXPO_PUBLIC_OPENWEATHER_API_KEY": "your_weather_key"
@@ -409,9 +409,9 @@ sanal deneme, AI, gardırop, moda, kıyafet, virtual try-on, wardrobe
 
 **Önerilen domain yapısı:**
 ```
-modli.com              → Landing page / Website
-api.modli.com          → Backend API
-app.modli.com          → Web app (optional)
+mekanizma.com          → Landing page / Website
+modli.mekanizma.com    → Backend API
+www.mekanizma.com      → Website redirect
 ```
 
 ### DNS Records
@@ -442,7 +442,7 @@ CNAME   www     modli.com           300
 - [ ] Environment variables yapılandırıldı
 - [ ] MongoDB bağlantısı çalışıyor
 - [ ] Supabase bağlantısı çalışıyor
-- [ ] Domain bağlandı (api.modli.com)
+- [ ] Domain bağlandı (modli.mekanizma.com)
 - [ ] SSL sertifikası aktif
 - [ ] Health check endpoint test edildi
 - [ ] CORS production URL'leri ayarlandı
@@ -544,7 +544,7 @@ python -c "import pymongo; print('MongoDB OK')"
 ### Mobile app backend'e bağlanamıyor
 ```bash
 # Backend URL kontrolü
-curl https://api.modli.com/health
+curl https://modli.mekanizma.com/health
 
 # CORS kontrolü
 # server.py'da allow_origins kontrol edin

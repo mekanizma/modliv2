@@ -1,25 +1,6 @@
 version: '3.8'
 
 services:
-  # Backend API
-  backend:
-    build: ./backend
-    container_name: modli-backend
-    ports:
-      - "8000:8000"
-    environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=${DB_NAME:-modli_prod}
-      - FAL_KEY=${FAL_KEY}
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_KEY=${SUPABASE_KEY}
-    depends_on:
-      - mongodb
-    restart: unless-stopped
-    networks:
-      - modli-network
-
   # MongoDB Database
   mongodb:
     image: mongo:7
@@ -35,6 +16,38 @@ services:
     restart: unless-stopped
     networks:
       - modli-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Backend API
+  backend:
+    build: ./backend
+    container_name: modli-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASS:-changeme}@mongodb:27017
+      - DB_NAME=${DB_NAME:-modli_prod}
+      - FAL_KEY=${FAL_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - modli-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 volumes:
   mongo-data:
