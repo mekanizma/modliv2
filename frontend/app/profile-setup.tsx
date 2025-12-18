@@ -29,7 +29,7 @@ const genders = ['male', 'female', 'other'] as const;
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();  // ✅ language'ı da burada al
   const { updateProfile, user } = useAuth();
   const insets = useSafeAreaInsets();
   
@@ -42,7 +42,7 @@ export default function ProfileSetupScreen() {
   const [loading, setLoading] = useState(false);
 
   const pickImage = async (useCamera: boolean) => {
-    const { language } = useLanguage();
+    // ✅ language artık yukarıdaki hook'tan geliyor
     
     try {
       const permissionResult = useCamera
