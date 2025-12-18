@@ -333,10 +333,9 @@ export default function TryOnScreen() {
                     style={[
                       styles.progressFill,
                       {
-                        width: spinValue.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: ['0%', '100%']
-                        })
+                        transform: [{
+                          scaleX: spinValue
+                        }]
                       }
                     ]} 
                   />
@@ -609,8 +608,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
     borderRadius: 2,
     overflow: 'hidden',
+    alignItems: 'flex-start',
   },
   progressFill: {
+    width: '100%',
     height: '100%',
     backgroundColor: '#6366f1',
     borderRadius: 2,
