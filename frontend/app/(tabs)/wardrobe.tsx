@@ -10,6 +10,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguage } from '../../src/contexts/LanguageContext';
