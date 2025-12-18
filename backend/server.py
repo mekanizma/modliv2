@@ -391,7 +391,10 @@ async def create_wardrobe_item(item: WardrobeItemCreate):
                 )
 
         return {"success": True}
-
+        
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise
 
 @api_router.post("/tryon-results")
 async def create_tryon_result(payload: TryOnResultCreate):
