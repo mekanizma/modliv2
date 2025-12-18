@@ -144,3 +144,4 @@ npm install react-native-image-resizer
 
 Tüm optimizasyonlar **görsel kalite kaybı minimumda tutularak** yapılmıştır.  
 Kullanıcı deneyimi önceliklidir! 🎨✨
+

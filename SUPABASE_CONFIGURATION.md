@@ -226,3 +226,4 @@ const redirectTo = __DEV__
 ⚠️ **Supabase Dashboard:** Site URL ve Redirect URLs ayarlarını yapmanız gerekiyor
 
 **Yapılacak:** Yukarıdaki adımları Supabase dashboard'da uygulayın!
+

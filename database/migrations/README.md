@@ -54,3 +54,4 @@ ALTER TABLE wardrobe_items ALTER COLUMN season DROP NOT NULL;
 1. SQL Editor'da hatayı kontrol edin
 2. Tablo isminin doğru olduğundan emin olun
 3. Gerekli yetkilere sahip olduğunuzdan emin olun
+

@@ -13,3 +13,4 @@ ALTER COLUMN season DROP NOT NULL;
 -- Add comment to document the change
 COMMENT ON COLUMN wardrobe_items.color IS 'Optional: Color of the clothing item';
 COMMENT ON COLUMN wardrobe_items.season IS 'Optional: Season suitability (summer, winter, spring, autumn, all)';
+

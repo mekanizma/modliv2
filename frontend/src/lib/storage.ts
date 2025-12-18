@@ -53,3 +53,4 @@ export async function uploadImageToStorage(
 export function getFilenameFromUrl(url: string): string {
   return url.split('/').pop() || 'unknown';
 }
+

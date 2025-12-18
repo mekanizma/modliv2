@@ -1,6 +1,6 @@
 # 🚀 Modli Coolify Deployment Guide
 
-Bu rehber, Modli uygulamasını Coolify ile MongoDB dahil tam olarak deploy etmek için adım adım talimatlar içerir.
+Bu rehber, Modli uygulamasını Coolify ile **MongoDB + Backend birlikte** deploy etmek için adım adım talimatlar içerir.
 
 ## 📋 Backend URL
 **Production:** `https://modli.mekanizma.com`
@@ -13,6 +13,7 @@ Bu rehber, Modli uygulamasını Coolify ile MongoDB dahil tam olarak deploy etme
 
 - [x] **GitHub Repo:** https://github.com/mekanizma/modliv1
 - [x] **Backend URL:** https://modli.mekanizma.com
+- [x] **Docker Compose:** ✅ Hazır (MongoDB + Backend birlikte)
 - [ ] **Sunucu IP Adresi:** _______________________
 - [ ] **Domain DNS Ayarları:** Yapıldı ✅
 - [ ] **API Keys:** Hazır ✅
@@ -30,55 +31,15 @@ TTL: 300
 
 ---
 
-## 🐳 Coolify'da Deployment
+## 🐳 Coolify'da Deployment (Docker Compose)
 
-### 1️⃣ MongoDB Service Oluşturma
+### ⭐ Önerilen: Docker Compose ile Tek Seferde Deploy
 
-#### MongoDB Container Deploy
+MongoDB ve Backend'i **birlikte** deploy ediyoruz. `docker-compose.yml` dosyası zaten hazır!
 
-1. **Coolify Dashboard** → `+ New Resource` → `Service`
-2. **Service Type:** `MongoDB`
-3. **Configuration:**
+### 1️⃣ Docker Compose Deployment
 
-```yaml
-Service Name: modli-mongodb
-Version: 7
-Port: 27017 (internal)
-
-Environment Variables:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=your_secure_password_123
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Persistent Storage:
-  /data/db (MongoDB data directory)
-  /data/configdb (MongoDB config)
-
-Network: modli-network (oluşturulacak)
-```
-
-4. **Deploy** butonuna basın
-5. MongoDB hazır olduğunda **Internal Hostname** not alın: `modli-mongodb`
-
-#### MongoDB Test
-
-```bash
-# Coolify Terminal veya SSH
-docker exec -it modli-mongodb mongosh -u admin -p your_secure_password_123
-
-# MongoDB shell'de:
-> show dbs
-> use modli_prod
-> db.test.insertOne({test: "connection"})
-> exit
-```
-
----
-
-### 2️⃣ Backend Application Deploy
-
-#### Application Configuration
+#### Docker Compose Deployment (MongoDB + Backend Birlikte)
 
 1. **Coolify Dashboard** → `+ New Resource` → `Application`
 
@@ -86,30 +47,23 @@ docker exec -it modli-mongodb mongosh -u admin -p your_secure_password_123
 ```
 Repository: https://github.com/mekanizma/modliv1.git
 Branch: main
-Base Directory: /
-Build Pack: Dockerfile
-Dockerfile Location: backend/Dockerfile
+Base Directory: / (root)
+Build Pack: Docker Compose
+Docker Compose Location: docker-compose.yml (root'ta)
 ```
 
-3. **Build Settings:**
+3. **Application Settings:**
 ```
-Application Name: modli-backend
-Build Command: (auto from Dockerfile)
-Start Command: (auto from Dockerfile)
-```
-
-4. **Ports Configuration:**
-```
-Container Port: 8000
-Published Port: 8001 (veya başka boş port)
-Protocol: HTTP
+Application Name: modli-app
+Type: Docker Compose
 ```
 
-5. **Environment Variables:**
+4. **Environment Variables** (`.env` dosyası için):
 
 ```env
-# MongoDB Connection
-MONGO_URL=mongodb://admin:your_secure_password_123@modli-mongodb:27017
+# MongoDB Credentials
+MONGO_ROOT_USER=admin
+MONGO_ROOT_PASS=your_secure_password_123
 DB_NAME=modli_prod
 
 # API Keys
@@ -124,30 +78,57 @@ SUPABASE_KEY=your_supabase_service_role_key
 ALLOWED_ORIGINS=https://modli.mekanizma.com,http://localhost:8081,http://localhost:19006
 ```
 
+5. **Services** (Otomatik tanınır):
+```yaml
+✅ mongodb    (port 27017 - internal)
+✅ backend    (port 8000 - exposed)
+```
+
 6. **Network:**
 ```
-Network: modli-network (MongoDB ile aynı network)
+Network: modli-network (otomatik oluşturulur)
+Dependencies: Backend depends on MongoDB (otomatik)
 ```
 
-7. **Deploy Dependencies:**
+7. **Volumes** (Persistent Storage):
 ```
-Depends On: modli-mongodb
-Wait for healthy: ✅
-```
-
-8. **Health Check:**
-```
-Health Check URL: /health
-Check Interval: 30s
-Timeout: 10s
-Retries: 3
+✅ mongo-data     → /data/db
+✅ mongo-config   → /data/configdb
 ```
 
-9. **Deploy** butonuna basın!
+8. **Deploy** butonuna basın!
+
+**🎉 Tek tıkla hem MongoDB hem Backend deploy edilir!**
+
+#### Deployment Süreci
+
+```bash
+# Coolify otomatik olarak:
+1. ✅ Docker Compose dosyasını okur
+2. ✅ MongoDB container'ı başlatır
+3. ✅ MongoDB health check bekler
+4. ✅ Backend container'ı build eder
+5. ✅ Backend'i başlatır (MongoDB'ye bağlanır)
+6. ✅ Network oluşturur (modli-network)
+7. ✅ Volumes mount eder (persistent data)
+```
+
+#### Test
+
+```bash
+# Backend health check
+curl https://modli.mekanizma.com/health
+
+# MongoDB test (Coolify terminal)
+docker exec -it modli-app-mongodb-1 mongosh -u admin -p your_secure_password_123
+
+# Logs
+docker-compose logs -f
+```
 
 ---
 
-### 3️⃣ Domain & SSL Configuration
+### 2️⃣ Domain & SSL Configuration
 
 #### Domain Setup
 
@@ -223,46 +204,102 @@ eas build --platform android --profile production
 
 ---
 
-## 🔄 Docker Compose ile Local Test
+---
+
+## 🔄 Local Test (Docker Compose)
 
 Deploy etmeden önce local'de test edebilirsiniz:
 
+### Local Test Adımları
+
 ```bash
-# Repo'yu klonlayın
+# 1. Repo'yu klonlayın
 git clone https://github.com/mekanizma/modliv1.git
 cd modliv1
 
-# .env dosyası oluşturun
+# 2. .env dosyası oluşturun
 cp .env.example .env
-
-# .env'yi düzenleyin:
-nano .env
 ```
 
 **`.env` içeriği:**
 ```env
+# MongoDB Credentials
 MONGO_ROOT_USER=admin
 MONGO_ROOT_PASS=test123
-DB_NAME=modli_prod
-FAL_KEY=your_key
-OPENWEATHER_API_KEY=your_key
+DB_NAME=modli_dev
+
+# API Keys
+FAL_KEY=your_fal_key
+OPENWEATHER_API_KEY=your_weather_key
+
+# Supabase
 SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=your_key
+SUPABASE_KEY=your_service_key
 ```
 
 ```bash
-# Docker Compose ile başlat
+# 3. Docker Compose ile başlat (MongoDB + Backend birlikte)
 docker-compose up -d
 
-# Logs
+# 4. Logs kontrol et
 docker-compose logs -f
 
-# Test
+# 5. Test et
 curl http://localhost:8000/health
 
-# Durdur
+# Beklenen çıktı:
+# {
+#   "status": "healthy",
+#   "services": {
+#     "mongodb": "connected",
+#     "fal_api": "configured"
+#   }
+# }
+
+# 6. Durdur
 docker-compose down
+
+# Volumes ile birlikte temizle (dikkat: data silinir!)
+docker-compose down -v
 ```
+
+### docker-compose.yml Yapısı
+
+Dosya zaten hazır ve şunları içeriyor:
+
+```yaml
+services:
+  mongodb:
+    image: mongo:7
+    ports: ["27017:27017"]
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASS}
+    healthcheck: ✅
+    
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    depends_on:
+      mongodb:
+        condition: service_healthy  # ✅ MongoDB hazır olana kadar bekler
+    environment:
+      - MONGO_URL=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@mongodb:27017
+      - DB_NAME=${DB_NAME}
+      # ... diğer env vars
+    healthcheck: ✅
+
+volumes:
+  mongo-data:
+  mongo-config:
+
+networks:
+  modli-network:
+```
+
+**✅ MongoDB + Backend birlikte, otomatik dependency yönetimi!**
 
 ---
 
@@ -438,22 +475,22 @@ docker exec modli-mongodb mongodump --out /backup
 - [ ] API keys hazır
 - [ ] Supabase production projesi hazır
 - [ ] .env.example değerleri dolduruldu
+- [ ] docker-compose.yml kontrol edildi
 
-### MongoDB Setup
-- [ ] MongoDB service oluşturuldu
-- [ ] Root user credentials ayarlandı
-- [ ] Persistent storage yapılandırıldı
-- [ ] Health check çalışıyor
+### Docker Compose Deployment
+- [ ] Coolify'da Docker Compose application oluşturuldu
+- [ ] GitHub repo bağlandı
+- [ ] Environment variables eklendi (.env)
+- [ ] MongoDB + Backend birlikte deploy edildi
+- [ ] MongoDB health check çalışıyor
+- [ ] Backend health check çalışıyor
 - [ ] Network oluşturuldu (modli-network)
+- [ ] Persistent volumes mount edildi
 
-### Backend Setup
-- [ ] Application oluşturuldu
-- [ ] Dockerfile build başarılı
-- [ ] Environment variables eklendi
-- [ ] MongoDB bağlantısı test edildi
-- [ ] Health check endpoint test edildi
+### Domain & SSL
 - [ ] Domain bağlandı (modli.mekanizma.com)
-- [ ] SSL sertifikası aktif
+- [ ] SSL sertifikası aktif (Let's Encrypt)
+- [ ] HTTPS forced
 - [ ] CORS ayarları doğru
 
 ### Frontend Setup
@@ -508,3 +545,4 @@ Test endpoints:
 **🚀 Artık production'dasınız!**
 
 Made with ❤️ by Mekanizma Team
+
