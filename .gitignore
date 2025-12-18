@@ -79,6 +79,7 @@ agenthub/agents/youtube/db
 # Mobile development (Expo/React Native)
 .expo/
 .expo-shared/
+.metro-cache/
 android-sdk/
 *.apk
 *.aab

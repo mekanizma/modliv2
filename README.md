@@ -104,7 +104,16 @@ modli-main/
 - **MongoDB** (local veya Atlas)
 - **Supabase Account** (ücretsiz tier yeterli)
 
-### 1️⃣ Backend Kurulumu
+### 1️⃣ Backend (Production Kullanıyoruz)
+
+**Not:** Development için local backend çalıştırmanıza gerek yok! Production backend'i kullanıyoruz.
+
+```bash
+# Backend Production URL
+https://modli.mekanizma.com
+```
+
+Eğer local backend çalıştırmak isterseniz:
 
 ```bash
 # Backend klasörüne gidin
@@ -129,8 +138,6 @@ cp .env.example .env
 # Backend'i çalıştırın
 uvicorn server:app --reload --host 0.0.0.0 --port 8000
 ```
-
-**Backend çalışıyor:** http://localhost:8000
 
 ### 2️⃣ Frontend Kurulumu
 
@@ -175,8 +182,8 @@ SUPABASE_KEY=your_supabase_service_key
 
 #### Frontend `.env`
 ```env
-# Backend API
-EXPO_PUBLIC_BACKEND_URL=http://YOUR_LOCAL_IP:8000
+# Backend API (using production backend for development)
+EXPO_PUBLIC_BACKEND_URL=https://modli.mekanizma.com
 
 # Supabase
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -184,6 +191,11 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # OpenWeatherMap
 EXPO_PUBLIC_OPENWEATHER_API_KEY=your_openweather_key
+```
+
+**Not:** Development sırasında production backend'i kullanıyoruz. Local backend kullanmak isterseniz:
+```env
+EXPO_PUBLIC_BACKEND_URL=http://YOUR_LOCAL_IP:8000
 ```
 
 ### 4️⃣ Database Setup
