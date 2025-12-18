@@ -20,6 +20,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../src/lib/supabase';
 import { ClothingCategory, Season, CLOTHING_COLORS } from '../src/types';
+import axios from 'axios';
+
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 const categories: { key: ClothingCategory; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'tops', icon: 'shirt-outline' },
@@ -117,10 +120,29 @@ export default function AddItemScreen() {
 
     setSaving(true);
     try {
+      console.log('📤 Uploading image to Supabase Storage...');
+      
+      // Upload image to Supabase Storage via backend (creates thumbnail automatically)
+      const uploadResponse = await axios.post(`${BACKEND_URL}/api/upload-image`, {
+        image_base64: imageBase64,
+        bucket: 'wardrobe',
+        user_id: user.id,
+        filename: `${category}_${Date.now()}`,
+      });
+
+      if (!uploadResponse.data.success) {
+        throw new Error(uploadResponse.data.error || 'Upload failed');
+      }
+
+      const { full_url, thumbnail_url } = uploadResponse.data;
+      console.log('✅ Image uploaded:', { full_url, thumbnail_url });
+
+      // Save to database with URLs (not base64)
       const itemData: any = {
         user_id: user.id,
         name,
-        image_base64: imageBase64,
+        image_url: full_url,
+        thumbnail_url: thumbnail_url,
         category,
       };
       
@@ -132,10 +154,14 @@ export default function AddItemScreen() {
 
       if (error) throw error;
 
+      console.log('✅ Item saved to database');
       router.back();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving item:', error);
-      Alert.alert('Error', 'Failed to save item');
+      Alert.alert(
+        language === 'en' ? 'Error' : 'Hata', 
+        error.response?.data?.error || error.message || (language === 'en' ? 'Failed to save item' : 'Parça kaydedilemedi')
+      );
     } finally {
       setSaving(false);
     }

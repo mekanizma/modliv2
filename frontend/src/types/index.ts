@@ -2,7 +2,9 @@ export interface WardrobeItem {
   id: string;
   user_id: string;
   name: string;
-  image_base64: string;
+  image_url: string;  // Supabase Storage URL (full size)
+  thumbnail_url: string;  // Supabase Storage URL (300x300 thumbnail)
+  image_base64?: string;  // Deprecated - for backward compatibility
   category: ClothingCategory;
   season: Season;
   color: string;
@@ -28,7 +30,8 @@ export interface TryOnResult {
   id: string;
   user_id: string;
   wardrobe_item_id: string;
-  result_image_base64: string;
+  result_image_url: string;  // Supabase Storage URL
+  result_image_base64?: string;  // Deprecated - for backward compatibility
   created_at: string;
 }
 

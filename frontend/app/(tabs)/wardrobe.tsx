@@ -165,10 +165,15 @@ export default function WardrobeScreen() {
       onPress={() => router.push({ pathname: '/try-on', params: { itemId: item.id } })}
       onLongPress={() => handleDeleteItem(item)}
     >
-      <Image 
-        source={{ uri: item.thumbnail_url || item.image_base64 }} 
+      <Image
+        source={{ uri: item.thumbnail_url || item.image_url || item.image_base64 }}
         style={styles.itemImage}
         defaultSource={require('../../assets/images/icon.png')}
+        resizeMode="cover"
+        // Lazy loading and caching optimizations
+        fadeDuration={200}
+        progressiveRenderingEnabled={true}
+        loadingIndicatorSource={require('../../assets/images/icon.png')}
       />
       <View style={styles.itemInfo}>
         <Text style={styles.itemName} numberOfLines={1}>

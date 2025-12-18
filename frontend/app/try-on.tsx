@@ -200,7 +200,7 @@ export default function TryOnScreen() {
       const response = await axios.post(`${BACKEND_URL}/api/try-on`, {
         user_id: user?.id,
         user_image: userImage,
-        clothing_image: selectedItem.image_base64,
+        clothing_image: selectedItem.image_url || selectedItem.image_base64,
         clothing_category: selectedItem.category,
         is_free_trial: isFreeTrial,
       });
@@ -371,7 +371,11 @@ export default function TryOnScreen() {
               {language === 'en' ? 'Selected Item' : 'Seçilen Parça'}
             </Text>
             <View style={styles.selectedItemCard}>
-              <Image source={{ uri: selectedItem.image_base64 }} style={styles.selectedItemImage} />
+              <Image 
+                source={{ uri: selectedItem.thumbnail_url || selectedItem.image_url || selectedItem.image_base64 }} 
+                style={styles.selectedItemImage}
+                resizeMode="cover"
+              />
               <View style={styles.selectedItemInfo}>
                 <Text style={styles.selectedItemName}>{selectedItem.name}</Text>
                 <Text style={styles.selectedItemCategory}>
@@ -417,7 +421,11 @@ export default function TryOnScreen() {
                     setResultImage(null);
                   }}
                 >
-                  <Image source={{ uri: item.image_base64 }} style={styles.itemImage} />
+                  <Image 
+                    source={{ uri: item.thumbnail_url || item.image_url || item.image_base64 }} 
+                    style={styles.itemImage}
+                    resizeMode="cover"
+                  />
                   {selectedItem?.id === item.id && (
                     <View style={styles.selectedBadge}>
                       <Ionicons name="checkmark" size={14} color="#fff" />

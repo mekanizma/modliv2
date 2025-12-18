@@ -30,7 +30,8 @@ interface TryOnResult {
   id: string;
   user_id: string;
   wardrobe_item_id: string;
-  result_image_base64: string;
+  result_image_url: string;  // Supabase Storage URL
+  result_image_base64?: string;  // Deprecated - for backward compatibility
   created_at: string;
 }
 
@@ -177,22 +178,28 @@ export default function GalleryScreen() {
   };
 
   const handleShare = async () => {
-    if (!selectedImage || !selectedImage.result_image_base64) {
+    const imageUrl = selectedImage?.result_image_url || selectedImage?.result_image_base64;
+    if (!selectedImage || !imageUrl) {
       Alert.alert(language === 'en' ? 'Error' : 'Hata', language === 'en' ? 'Image not found' : 'Resim bulunamadı');
       return;
     }
-    
+
     setActionLoading(true);
     try {
-      let base64Data = selectedImage.result_image_base64;
-      if (base64Data.includes('base64,')) {
-        base64Data = base64Data.split('base64,')[1];
-      }
-      
       const filename = `modli_share_${Date.now()}.jpg`;
       const fileUri = `${FileSystem.cacheDirectory}${filename}`;
 
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: 'base64' });
+      // If it's a URL, download it first
+      if (imageUrl.startsWith('http')) {
+        await FileSystem.downloadAsync(imageUrl, fileUri);
+      } else {
+        // Legacy: If it's base64
+        let base64Data = imageUrl;
+        if (base64Data.includes('base64,')) {
+          base64Data = base64Data.split('base64,')[1];
+        }
+        await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: 'base64' });
+      }
 
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
@@ -222,7 +229,8 @@ export default function GalleryScreen() {
             closeModal();
             // Store base image in AsyncStorage for faster navigation
             try {
-              await AsyncStorage.setItem('tryOnBaseImage', selectedImage.result_image_base64);
+              const imageUrl = selectedImage.result_image_url || selectedImage.result_image_base64;
+              await AsyncStorage.setItem('tryOnBaseImage', imageUrl!);
               // Navigate with just a flag instead of huge base64 string
               router.push({
                 pathname: '/try-on',
@@ -287,15 +295,19 @@ export default function GalleryScreen() {
   };
 
   const renderItem = ({ item }: { item: TryOnResult }) => (
-    <TouchableOpacity 
-      style={styles.imageCard} 
-      onPress={() => handleImagePress(item)} 
+    <TouchableOpacity
+      style={styles.imageCard}
+      onPress={() => handleImagePress(item)}
       activeOpacity={0.8}
     >
-      <Image 
-        source={{ uri: item.result_image_base64 }} 
+      <Image
+        source={{ uri: item.result_image_url || item.result_image_base64 }}
         style={styles.image}
         resizeMode="cover"
+        // Lazy loading and caching optimizations
+        fadeDuration={200}
+        progressiveRenderingEnabled={true}
+        loadingIndicatorSource={require('../../assets/images/icon.png')}
       />
       <View style={styles.imageDate}>
         <Ionicons name="time-outline" size={12} color="#9ca3af" />
@@ -365,7 +377,11 @@ export default function GalleryScreen() {
 
           {selectedImage && (
             <View style={styles.imageWrapper}>
-              <Image source={{ uri: selectedImage.result_image_base64 }} style={styles.fullImage} resizeMode="contain" />
+              <Image 
+                source={{ uri: selectedImage.result_image_url || selectedImage.result_image_base64 }} 
+                style={styles.fullImage} 
+                resizeMode="contain" 
+              />
             </View>
           )}
 
