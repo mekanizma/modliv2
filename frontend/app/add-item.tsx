@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { ClothingCategory, Season, CLOTHING_COLORS } from '../src/types';
 import axios from 'axios';
+import { uploadImageToStorage } from '../src/lib/storage';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -43,7 +44,7 @@ export default function AddItemScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ClothingCategory | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
@@ -85,19 +86,17 @@ export default function AddItemScreen() {
             mediaTypes: ['images'],
             allowsEditing: false,
             quality: 0.5,
-            base64: true,
             exif: false,
           })
         : await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: false,
             quality: 0.5,
-            base64: true,
             exif: false,
           });
 
-      if (!result.canceled && result.assets[0].base64) {
-        setImageBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      if (!result.canceled && result.assets[0].uri) {
+        setImageUri(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -110,7 +109,7 @@ export default function AddItemScreen() {
 
   const handleSave = async () => {
     // Only require image, name, and category (season and color are optional)
-    if (!imageBase64 || !name || !category) {
+    if (!imageUri || !name || !category) {
       Alert.alert(
         language === 'en' ? 'Missing Fields' : 'Eksik Alanlar',
         language === 'en' ? 'Please add photo, name and category' : 'Lütfen fotoğraf, isim ve kategori ekleyin'
@@ -123,28 +122,26 @@ export default function AddItemScreen() {
     setSaving(true);
     try {
       console.log('📤 Uploading image to Supabase Storage...');
-      
-      // Upload image to Supabase Storage via backend (creates thumbnail automatically)
-      const uploadResponse = await axios.post(`${BACKEND_URL}/api/upload-image`, {
-        image_base64: imageBase64,
-        bucket: 'wardrobe',
-        user_id: user.id,
-        filename: `${category}_${Date.now()}`,
-      });
+      const uploadResponse = await uploadImageToStorage(
+        imageUri,
+        user.id,
+        'wardrobe',
+        `${category}_${Date.now()}`
+      );
 
-      if (!uploadResponse.data.success) {
-        throw new Error(uploadResponse.data.error || 'Upload failed');
+      if (!uploadResponse.success || !uploadResponse.fullUrl || !uploadResponse.thumbnailUrl) {
+        throw new Error(uploadResponse.error || 'Upload failed');
       }
 
-      const { full_url, thumbnail_url } = uploadResponse.data;
-      console.log('✅ Image uploaded:', { full_url, thumbnail_url });
+      const { fullUrl, thumbnailUrl } = uploadResponse;
+      console.log('✅ Image uploaded:', { fullUrl, thumbnailUrl });
 
       // Save to database via backend (service role kullanarak)
       await axios.post(`${BACKEND_URL}/api/wardrobe-items`, {
         user_id: user.id,
         name,
-        image_url: full_url,
-        thumbnail_url: thumbnail_url,
+        image_url: fullUrl,
+        thumbnail_url: thumbnailUrl,
         category,
         season: season || null,
         color: color || null,
@@ -213,8 +210,8 @@ export default function AddItemScreen() {
             );
           }}
         >
-          {imageBase64 ? (
-            <Image source={{ uri: imageBase64 }} style={styles.selectedImage} />
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.selectedImage} />
           ) : (
             <View style={styles.imagePlaceholder}>
               <Ionicons name="camera" size={40} color="#6366f1" />

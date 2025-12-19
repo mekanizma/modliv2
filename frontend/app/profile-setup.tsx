@@ -18,6 +18,7 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadImageToStorage } from '../src/lib/storage';
 
 const styleThemes = [
   { id: 'casual', icon: 'shirt-outline', color: '#22c55e' },
@@ -34,7 +35,7 @@ export default function ProfileSetupScreen() {
   const insets = useSafeAreaInsets();
   
   const [step, setStep] = useState(1);
-  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [gender, setGender] = useState<typeof genders[number] | null>(null);
@@ -78,19 +79,17 @@ export default function ProfileSetupScreen() {
             mediaTypes: ['images'],
             allowsEditing: false,
             quality: 0.6,
-            base64: true,
             exif: false,
           })
         : await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ['images'],
             allowsEditing: false,
             quality: 0.6,
-            base64: true,
             exif: false,
           });
 
-      if (!result.canceled && result.assets[0].base64) {
-        setAvatarBase64(`data:image/jpeg;base64,${result.assets[0].base64}`);
+      if (!result.canceled && result.assets[0].uri) {
+        setAvatarUri(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -104,7 +103,7 @@ export default function ProfileSetupScreen() {
   };
 
   const handleNext = () => {
-    if (step === 1 && !avatarBase64) {
+    if (step === 1 && !avatarUri) {
       Alert.alert('Required', 'Please upload your photo');
       return;
     }
@@ -125,21 +124,49 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    setLoading(true);
-    const { error } = await updateProfile({
-      avatar_url: avatarBase64 || undefined,
-      height: parseFloat(height),
-      weight: parseFloat(weight),
-      gender: gender || undefined,
-      style_preference: stylePreference,
-      onboarding_completed: true,
-    });
-    setLoading(false);
+    if (!user) {
+      Alert.alert('Error', 'User not found');
+      return;
+    }
 
-    if (error) {
-      Alert.alert('Error', 'Failed to save profile');
-    } else {
-      router.replace('/(tabs)');
+    setLoading(true);
+    try {
+      let avatarUrl: string | undefined = undefined;
+
+      if (avatarUri) {
+        const uploadResult = await uploadImageToStorage(
+          avatarUri,
+          user.id,
+          'profiles',
+          `avatar_${Date.now()}`
+        );
+
+        if (!uploadResult.success || !uploadResult.fullUrl) {
+          throw new Error(uploadResult.error || 'Avatar upload failed');
+        }
+
+        avatarUrl = uploadResult.fullUrl;
+      }
+
+      const { error } = await updateProfile({
+        avatar_url: avatarUrl,
+        height: parseFloat(height),
+        weight: parseFloat(weight),
+        gender: gender || undefined,
+        style_preference: stylePreference,
+        onboarding_completed: true,
+      });
+
+      if (error) {
+        Alert.alert('Error', 'Failed to save profile');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (err: any) {
+      console.error('Profile completion error', err);
+      Alert.alert('Error', err.message || 'Failed to save profile');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -164,8 +191,8 @@ export default function ProfileSetupScreen() {
             );
           }}
         >
-          {avatarBase64 ? (
-            <Image source={{ uri: avatarBase64 }} style={styles.avatar} />
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Ionicons name="camera" size={50} color="#6366f1" />

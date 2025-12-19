@@ -13,21 +13,32 @@ export interface UploadResult {
  * Returns URLs for both full and thumbnail images
  */
 export async function uploadImageToStorage(
-  imageBase64: string,
+  fileUri: string,
   userId: string,
   bucket: 'wardrobe' | 'profiles' = 'wardrobe',
-  filename?: string
+  filename?: string,
+  mimeType: string = 'image/jpeg'
 ): Promise<UploadResult> {
   try {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: fileUri,
+      name: `${filename || `upload_${Date.now()}`}.jpg`,
+      type: mimeType,
+    } as any);
+    formData.append('bucket', bucket);
+    formData.append('user_id', userId);
+    if (filename) {
+      formData.append('filename', filename);
+    }
+
     const response = await axios.post(
       `${EXPO_PUBLIC_BACKEND_URL}/api/upload-image`,
+      formData,
       {
-        image_base64: imageBase64,
-        bucket,
-        user_id: userId,
-        filename,
-      },
-      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
         timeout: 30000, // 30 second timeout
       }
     );

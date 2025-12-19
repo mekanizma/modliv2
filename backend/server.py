@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -92,14 +92,14 @@ class StatusCheckCreate(BaseModel):
 
 class TryOnRequest(BaseModel):
     user_id: str
-    user_image: str  # base64 encoded (data:image/jpeg;base64,...)
-    clothing_image: str  # base64 encoded (data:image/jpeg;base64,...)
+    user_image: str  # public URL for user image
+    clothing_image: str  # public URL for clothing image
     clothing_category: str
     is_free_trial: bool = False  # True if using free trial credit
 
 class TryOnResponse(BaseModel):
     success: bool
-    result_image: Optional[str] = None
+    result_image_url: Optional[str] = None
     error: Optional[str] = None
 
 class WeatherRequest(BaseModel):
@@ -112,13 +112,6 @@ class ImageUploadResponse(BaseModel):
     full_url: Optional[str] = None
     thumbnail_url: Optional[str] = None
     error: Optional[str] = None
-
-class ImageUploadRequest(BaseModel):
-    image_base64: str
-    bucket: str = "wardrobe"  # wardrobe or profiles
-    user_id: str
-    filename: Optional[str] = None
-
 
 class WardrobeItemCreate(BaseModel):
     user_id: str
@@ -133,7 +126,7 @@ class WardrobeItemCreate(BaseModel):
 class TryOnResultCreate(BaseModel):
     user_id: str
     wardrobe_item_id: str
-    result_image_base64: str
+    result_image_url: str
 
 
 # Routes
@@ -158,7 +151,7 @@ async def get_status_checks():
     return [StatusCheck(**status_check) for status_check in status_checks]
 
 
-async def try_on_with_fal(user_image: str, clothing_image: str, http_client: httpx.AsyncClient) -> TryOnResponse:
+async def try_on_with_fal(user_image: str, clothing_image: str, http_client: httpx.AsyncClient, user_id: Optional[str] = None) -> TryOnResponse:
     """Use fal.ai for all users"""
     try:
         if not FAL_KEY:
@@ -203,11 +196,37 @@ async def try_on_with_fal(user_image: str, clothing_image: str, http_client: htt
                 if image_url:
                     img_response = await http_client.get(image_url)
                     if img_response.status_code == 200:
-                        img_base64 = base64.b64encode(img_response.content).decode()
+                        result_url: Optional[str] = None
+
+                        if SUPABASE_URL and SUPABASE_KEY:
+                            try:
+                                from supabase import create_client, Client
+                                supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                                filename = f"{timestamp}_{uuid.uuid4().hex[:8]}_result.jpg"
+                                storage_path = f"{user_id or 'public'}/results/{filename}"
+
+                                upload_res = supabase.storage.from_("wardrobe").upload(
+                                    path=storage_path,
+                                    file=img_response.content,
+                                    file_options={"content-type": "image/jpeg"},
+                                )
+
+                                if getattr(upload_res, "error", None):
+                                    logger.error(f"Supabase storage upload error: {upload_res.error}")
+                                else:
+                                    result_url = supabase.storage.from_("wardrobe").get_public_url(storage_path)
+                            except Exception as e:
+                                logger.error(f"Supabase upload failed for try-on result: {str(e)}")
+
+                        if not result_url:
+                            result_url = image_url
+
                         logger.info("Successfully generated try-on image via fal.ai!")
                         return TryOnResponse(
                             success=True,
-                            result_image=f"data:image/jpeg;base64,{img_base64}"
+                            result_image_url=result_url
                         )
             
             return TryOnResponse(success=False, error="No images returned from API")
@@ -236,7 +255,8 @@ async def virtual_try_on(request: TryOnRequest):
             return await try_on_with_fal(
                 request.user_image,
                 request.clothing_image,
-                http_client
+                http_client,
+                request.user_id
             )
             
     except httpx.TimeoutException:
@@ -285,7 +305,12 @@ async def get_weather(request: WeatherRequest):
 
 
 @api_router.post("/upload-image", response_model=ImageUploadResponse)
-async def upload_image(request: ImageUploadRequest):
+async def upload_image(
+    file: UploadFile = File(...),
+    bucket: str = Form("wardrobe"),
+    user_id: str = Form(...),
+    filename: Optional[str] = Form(None),
+):
     """
     Upload image to Supabase Storage and create thumbnail
     Returns URLs for both full and thumbnail images
@@ -296,36 +321,35 @@ async def upload_image(request: ImageUploadRequest):
     try:
         from supabase import create_client, Client
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        
-        # Convert base64 to bytes
-        image_bytes = base64_to_bytes(request.image_base64)
+
+        image_bytes = await file.read()
         
         # Create thumbnail
         thumbnail_bytes = create_thumbnail(image_bytes, size=(300, 300))
         
         # Generate unique filenames
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = request.filename or f"{timestamp}_{uuid.uuid4().hex[:8]}"
-        full_path = f"{request.user_id}/{filename}_full.jpg"
-        thumb_path = f"{request.user_id}/{filename}_thumb.jpg"
+        safe_name = filename or f"{timestamp}_{uuid.uuid4().hex[:8]}"
+        full_path = f"{user_id}/{safe_name}_full.jpg"
+        thumb_path = f"{user_id}/{safe_name}_thumb.jpg"
         
         # Upload full image
-        full_upload = supabase.storage.from_(request.bucket).upload(
+        full_upload = supabase.storage.from_(bucket).upload(
             path=full_path,
             file=image_bytes,
             file_options={"content-type": "image/jpeg"}
         )
         
         # Upload thumbnail
-        thumb_upload = supabase.storage.from_(request.bucket).upload(
+        thumb_upload = supabase.storage.from_(bucket).upload(
             path=thumb_path,
             file=thumbnail_bytes,
             file_options={"content-type": "image/jpeg"}
         )
         
         # Get public URLs
-        full_url = supabase.storage.from_(request.bucket).get_public_url(full_path)
-        thumb_url = supabase.storage.from_(request.bucket).get_public_url(thumb_path)
+        full_url = supabase.storage.from_(bucket).get_public_url(full_path)
+        thumb_url = supabase.storage.from_(bucket).get_public_url(thumb_path)
         
         logger.info(f"✅ Image uploaded: {full_path}")
         
@@ -406,31 +430,7 @@ async def create_tryon_result(payload: TryOnResultCreate):
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        # Convert base64 to bytes
-        image_bytes = base64_to_bytes(payload.result_image_base64)
-
-        # Use same bucket as wardrobe, farklı klasör altında
-        from supabase import create_client, Client
-
-        supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_name = f"{timestamp}_{uuid.uuid4().hex[:8]}_result.jpg"
-        storage_path = f"{payload.user_id}/results/{file_name}"
-
-        upload_res = supabase_client.storage.from_("wardrobe").upload(
-            path=storage_path,
-            file=image_bytes,
-            file_options={"content-type": "image/jpeg"},
-        )
-
-        if getattr(upload_res, "error", None):
-            logger.error(f"Supabase storage upload error: {upload_res.error}")
-            raise HTTPException(status_code=500, detail=str(upload_res.error))
-
-        image_url = supabase_client.storage.from_("wardrobe").get_public_url(
-            storage_path
-        )
+        image_url = payload.result_image_url
 
         # Insert DB row via REST
         rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/try_on_results"
@@ -464,7 +464,7 @@ async def create_tryon_result(payload: TryOnResultCreate):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Wardrobe item create error: {str(e)}")
+        logger.error(f"Try-on result create error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

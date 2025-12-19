@@ -206,7 +206,12 @@ export default function TryOnScreen() {
       });
 
       if (response.data.success) {
-        setResultImage(response.data.result_image);
+        const resultUrl = response.data.result_image_url || response.data.result_image;
+        if (!resultUrl) {
+          throw new Error('Result URL not returned');
+        }
+
+        setResultImage(resultUrl);
         // Deduct credit
         await updateProfile({ credits: (profile.credits || 0) - 1 });
         await refreshProfile();
@@ -231,7 +236,7 @@ export default function TryOnScreen() {
       await axios.post(`${BACKEND_URL}/api/tryon-results`, {
         user_id: user.id,
         wardrobe_item_id: selectedItem.id,
-        result_image_base64: resultImage,
+        result_image_url: resultImage,
       });
 
       Alert.alert(

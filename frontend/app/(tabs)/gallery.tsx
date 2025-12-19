@@ -286,7 +286,7 @@ export default function GalleryScreen() {
       activeOpacity={0.8}
     >
       <Image
-        source={{ uri: item.result_image_url || item.result_image_base64 }}
+        source={{ uri: item.result_image_url }}
         style={styles.image}
         resizeMode="cover"
         // Lazy loading and caching optimizations
@@ -363,7 +363,7 @@ export default function GalleryScreen() {
           {selectedImage && (
             <View style={styles.imageWrapper}>
               <Image 
-                source={{ uri: selectedImage.result_image_url || selectedImage.result_image_base64 }} 
+                source={{ uri: selectedImage.result_image_url }} 
                 style={styles.fullImage} 
                 resizeMode="contain" 
               />

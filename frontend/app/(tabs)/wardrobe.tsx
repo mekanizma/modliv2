@@ -42,8 +42,8 @@ const seasons: { key: Season | 'all'; label: string }[] = [
 ];
 
 const { width } = Dimensions.get('window');
-// Kartlar arasında yatay boşluk bırakmak için marginleri de hesaba katarak genişlik hesaplıyoruz
-const imageSize = (width - 64) / 2; // 2 * 20 padding + 2 * 4 margin = 48, ekstra 16px boşluk için
+// Kartlar arasında ve kenarlarda boşluk: 2*20 padding + 2*6 margin = 52
+const imageSize = (width - 52) / 2;
 const ITEMS_PER_PAGE = 20;
 
 export default function WardrobeScreen() {
@@ -420,7 +420,6 @@ const styles = StyleSheet.create({
   },
   row: {
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
   },
   grid: {
     flexDirection: 'row',
@@ -429,7 +428,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     width: imageSize,
-    marginHorizontal: 4, // kartlar arasında yatay boşluk
+    marginHorizontal: 6, // kartlar arasında yatay boşluk
     backgroundColor: '#1a1a2e',
     borderRadius: 12,
     overflow: 'hidden',
