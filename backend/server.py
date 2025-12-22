@@ -190,14 +190,14 @@ async def reset_password_page():
 
     html = f"""
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" id="htmlLang">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Şifre Sıfırla • Modli</title>
+    <title id="pageTitle">Şifre Sıfırla • Modli</title>
     <style>
       :root {{
         color-scheme: dark;
@@ -498,6 +498,58 @@ async def reset_password_page():
         background: #fbbf24;
       }}
 
+      .lang-toggle {{
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: rgba(15, 23, 42, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }}
+
+      .lang-toggle:hover {{
+        background: rgba(15, 23, 42, 0.95);
+        border-color: rgba(148, 163, 184, 0.5);
+      }}
+
+      .success-message {{
+        display: none;
+        padding: 20px;
+        border-radius: 16px;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        margin-top: 16px;
+        text-align: center;
+      }}
+
+      .success-message.show {{
+        display: block;
+      }}
+
+      .success-icon {{
+        font-size: 48px;
+        margin-bottom: 12px;
+      }}
+
+      .success-title {{
+        font-size: 18px;
+        font-weight: 600;
+        color: #4ade80;
+        margin-bottom: 8px;
+      }}
+
+      .success-text {{
+        font-size: 14px;
+        color: var(--muted);
+        line-height: 1.5;
+      }}
+
       @media (max-width: 480px) {{
         .card {{
           border-radius: 20px;
@@ -506,6 +558,13 @@ async def reset_password_page():
 
         .headline {{
           font-size: 20px;
+        }}
+
+        .lang-toggle {{
+          top: 12px;
+          right: 12px;
+          padding: 5px 10px;
+          font-size: 11px;
         }}
       }}
     </style>
@@ -523,24 +582,25 @@ async def reset_password_page():
       </div>
 
       <main class="card" aria-labelledby="headline">
+        <button class="lang-toggle" id="langToggle" onclick="toggleLanguage()">EN</button>
         <div class="card-inner">
           <div class="chip-row">
             <div class="chip">
               <span class="chip-dot"></span>
-              Güvenli şifre sıfırlama
+              <span id="chipSecure">Güvenli şifre sıfırlama</span>
             </div>
             <div class="chip">Web • iOS • Android</div>
           </div>
 
-          <h1 id="headline" class="headline">Yeni şifreni belirle</h1>
-          <p class="subcopy">
+          <h1 id="headline" class="headline"><span id="titleText">Yeni şifreni belirle</span></h1>
+          <p class="subcopy" id="subcopyText">
             E-posta adresine gönderdiğimiz bağlantı üzerinden geldin.
             Güvenlik için buradan yeni Modli şifreni oluşturabilirsin.
           </p>
 
           <form id="resetForm" novalidate>
             <div class="field">
-              <label for="password">Yeni şifre</label>
+              <label for="password"><span id="labelPassword">Yeni şifre</span></label>
               <div class="input-wrap">
                 <svg
                   class="input-icon"
@@ -571,25 +631,25 @@ async def reset_password_page():
                   type="password"
                   autocomplete="new-password"
                   minlength="6"
-                  placeholder="En az 6 karakter"
+                  placeholder=""
                   required
                 />
                 <button
                   class="toggle-btn"
                   type="button"
                   id="toggleVisibility"
-                  aria-label="Şifreyi göster veya gizle"
+                  aria-label=""
                 >
-                  GÖSTER
+                  <span id="toggleText">GÖSTER</span>
                 </button>
               </div>
-              <p class="hint">
+              <p class="hint" id="hintText">
                 En iyi güvenlik için; en az 1 rakam, 1 harf ve 1 özel karakter öneriyoruz.
               </p>
             </div>
 
             <div class="field">
-              <label for="confirm">Şifreyi tekrar yaz</label>
+              <label for="confirm"><span id="labelConfirm">Şifreyi tekrar yaz</span></label>
               <div class="input-wrap">
                 <svg
                   class="input-icon"
@@ -620,7 +680,7 @@ async def reset_password_page():
                   type="password"
                   autocomplete="new-password"
                   minlength="6"
-                  placeholder="Tekrar yeni şifre"
+                  placeholder=""
                   required
                 />
               </div>
@@ -630,24 +690,26 @@ async def reset_password_page():
 
             <div class="submit">
               <button id="submitBtn" type="submit" class="btn-primary">
-                Şifreyi güncelle
+                <span id="submitText">Şifreyi güncelle</span>
               </button>
-              <button
-                type="button"
-                class="btn-secondary"
-                onclick="window.location.href='https://modli.app'">
-                Uygulamaya geri dön
-              </button>
+            </div>
+
+            <div class="success-message" id="successMessage">
+              <div class="success-icon">✓</div>
+              <div class="success-title" id="successTitle">Teşekkürler!</div>
+              <div class="success-text" id="successText">
+                Şifren başarıyla güncellendi. Artık Modli uygulamasına yeni şifrenle giriş yapabilirsin.
+              </div>
             </div>
 
             <div class="badge-row" aria-live="polite" aria-atomic="true">
               <div class="made-for">
-                <span class="pill">Geri dönüşümlü gardırop</span>
+                <span class="pill"><span id="badgeText">Geri dönüşümlü gardırop</span></span>
               </div>
               <div class="status-pill" id="linkStatus">
                 <span class="status-dot"></span>
                 <span class="status-text status-warn">
-                  Bağlantı doğrulanıyor…
+                  <span id="statusText">Bağlantı doğrulanıyor…</span>
                 </span>
               </div>
             </div>
@@ -667,8 +729,112 @@ async def reset_password_page():
       const form = document.getElementById("resetForm");
       const submitBtn = document.getElementById("submitBtn");
       const linkStatus = document.getElementById("linkStatus");
+      const successMessage = document.getElementById("successMessage");
 
       let accessToken = null;
+      let currentLang = localStorage.getItem("modli_lang") || "tr";
+
+      const translations = {{
+        tr: {{
+          chipSecure: "Güvenli şifre sıfırlama",
+          title: "Yeni şifreni belirle",
+          subcopy: "E-posta adresine gönderdiğimiz bağlantı üzerinden geldin. Güvenlik için buradan yeni Modli şifreni oluşturabilirsin.",
+          labelPassword: "Yeni şifre",
+          labelConfirm: "Şifreyi tekrar yaz",
+          passwordPlaceholder: "En az 6 karakter",
+          confirmPlaceholder: "Tekrar yeni şifre",
+          toggleShow: "GÖSTER",
+          toggleHide: "GİZLE",
+          hint: "En iyi güvenlik için; en az 1 rakam, 1 harf ve 1 özel karakter öneriyoruz.",
+          submit: "Şifreyi güncelle",
+          submitting: "Güncelleniyor…",
+          badge: "Geri dönüşümlü gardırop",
+          statusValidating: "Bağlantı doğrulanıyor…",
+          statusValid: "Bağlantın doğrulandı. Yeni şifreni belirleyebilirsin.",
+          statusInvalid: "Bağlantı geçersiz veya süresi dolmuş. Lütfen yeniden şifre sıfırlama iste.",
+          statusError: "Bağlantı okunamadı. Lütfen e-postandaki linke tekrar tıkla.",
+          errorInvalidLink: "Geçersiz bağlantı. Lütfen e-posta kutundan yeni bir şifre sıfırlama iste.",
+          errorEmptyFields: "Lütfen tüm alanları doldur.",
+          errorShortPassword: "Şifre en az 6 karakter olmalı.",
+          errorMismatch: "Şifreler birbiriyle eşleşmiyor.",
+          errorUpdateFailed: "Şifre güncellenemedi. Lütfen bağlantıyı tekrar deneyin.",
+          errorGeneric: "Bir hata oluştu. Lütfen birkaç dakika sonra tekrar dene.",
+          successTitle: "Teşekkürler!",
+          successText: "Şifren başarıyla güncellendi. Artık Modli uygulamasına yeni şifrenle giriş yapabilirsin.",
+        }},
+        en: {{
+          chipSecure: "Secure password reset",
+          title: "Set your new password",
+          subcopy: "You've arrived via the link we sent to your email address. For security, you can create your new Modli password here.",
+          labelPassword: "New password",
+          labelConfirm: "Confirm password",
+          passwordPlaceholder: "At least 6 characters",
+          confirmPlaceholder: "Re-enter new password",
+          toggleShow: "SHOW",
+          toggleHide: "HIDE",
+          hint: "For best security, we recommend at least 1 number, 1 letter, and 1 special character.",
+          submit: "Update password",
+          submitting: "Updating…",
+          badge: "Sustainable wardrobe",
+          statusValidating: "Validating link…",
+          statusValid: "Your link is verified. You can set your new password.",
+          statusInvalid: "Link is invalid or expired. Please request a new password reset.",
+          statusError: "Link could not be read. Please click the link in your email again.",
+          errorInvalidLink: "Invalid link. Please request a new password reset from your inbox.",
+          errorEmptyFields: "Please fill in all fields.",
+          errorShortPassword: "Password must be at least 6 characters.",
+          errorMismatch: "Passwords do not match.",
+          errorUpdateFailed: "Password could not be updated. Please try the link again.",
+          errorGeneric: "An error occurred. Please try again in a few minutes.",
+          successTitle: "Thank you!",
+          successText: "Your password has been successfully updated. You can now sign in to the Modli app with your new password.",
+        }}
+      }};
+
+      function updateLanguage(lang) {{
+        currentLang = lang;
+        localStorage.setItem("modli_lang", lang);
+        const t = translations[lang];
+        
+        document.getElementById("htmlLang").setAttribute("lang", lang);
+        document.getElementById("pageTitle").textContent = lang === "tr" ? "Şifre Sıfırla • Modli" : "Reset Password • Modli";
+        document.getElementById("chipSecure").textContent = t.chipSecure;
+        document.getElementById("titleText").textContent = t.title;
+        document.getElementById("subcopyText").textContent = t.subcopy;
+        document.getElementById("labelPassword").textContent = t.labelPassword;
+        document.getElementById("labelConfirm").textContent = t.labelConfirm;
+        passwordInput.placeholder = t.passwordPlaceholder;
+        confirmInput.placeholder = t.confirmPlaceholder;
+        document.getElementById("toggleText").textContent = passwordInput.type === "password" ? t.toggleShow : t.toggleHide;
+        document.getElementById("hintText").textContent = t.hint;
+        document.getElementById("submitText").textContent = t.submit;
+        document.getElementById("badgeText").textContent = t.badge;
+        document.getElementById("successTitle").textContent = t.successTitle;
+        document.getElementById("successText").textContent = t.successText;
+        
+        const langToggle = document.getElementById("langToggle");
+        langToggle.textContent = lang === "tr" ? "EN" : "TR";
+        
+        if (linkStatus) {{
+          const statusTextEl = document.getElementById("statusText");
+          if (statusTextEl) {{
+            const currentStatus = linkStatus.querySelector(".status-text").classList.contains("status-ok") ? "ok" : 
+                                 linkStatus.querySelector(".status-text").classList.contains("status-error") ? "error" : "warn";
+            if (currentStatus === "ok") {{
+              statusTextEl.textContent = t.statusValid;
+            }} else if (currentStatus === "error") {{
+              statusTextEl.textContent = t.statusInvalid;
+            }} else {{
+              statusTextEl.textContent = t.statusValidating;
+            }}
+          }}
+        }}
+      }}
+
+      function toggleLanguage() {{
+        const newLang = currentLang === "tr" ? "en" : "tr";
+        updateLanguage(newLang);
+      }}
 
       function parseHash() {{
         const hash = window.location.hash.startsWith("#")
@@ -685,7 +851,12 @@ async def reset_password_page():
         if (!linkStatus) return;
         const textSpan = linkStatus.querySelector(".status-text");
         if (!textSpan) return;
-        textSpan.textContent = text;
+        const statusTextEl = document.getElementById("statusText");
+        if (statusTextEl) {{
+          statusTextEl.textContent = text;
+        }} else {{
+          textSpan.textContent = text;
+        }}
         textSpan.classList.remove("status-ok", "status-warn", "status-error");
         if (kind === "ok") textSpan.classList.add("status-ok");
         else if (kind === "error") textSpan.classList.add("status-error");
@@ -703,31 +874,27 @@ async def reset_password_page():
       }}
 
       (function init() {{
+        updateLanguage(currentLang);
+        
         try {{
           const {{ access_token, type }} = parseHash();
+          const t = translations[currentLang];
+          
           if (!access_token) {{
-            setStatus(
-              "error",
-              "Bağlantı geçersiz veya süresi dolmuş. Lütfen yeniden şifre sıfırlama iste."
-            );
+            setStatus("error", t.statusInvalid);
             submitBtn.disabled = true;
             return;
           }}
           if (type && type !== "recovery") {{
-            setStatus(
-              "warn",
-              "Farklı bir bağlantı türü algılandı. Yine de devam edebilirsin."
-            );
+            setStatus("warn", t.statusValidating);
           }} else {{
-            setStatus("ok", "Bağlantın doğrulandı. Yeni şifreni belirleyebilirsin.");
+            setStatus("ok", t.statusValid);
           }}
           accessToken = access_token;
         }} catch (e) {{
           console.error(e);
-          setStatus(
-            "error",
-            "Bağlantı okunamadı. Lütfen e-postandaki linke tekrar tıkla."
-          );
+          const t = translations[currentLang];
+          setStatus("error", t.statusError);
           submitBtn.disabled = true;
         }}
       }})();
@@ -736,17 +903,17 @@ async def reset_password_page():
         const isPassword = passwordInput.type === "password";
         passwordInput.type = isPassword ? "text" : "password";
         confirmInput.type = isPassword ? "text" : "password";
-        toggleBtn.textContent = isPassword ? "GİZLE" : "GÖSTER";
+        const t = translations[currentLang];
+        document.getElementById("toggleText").textContent = isPassword ? t.toggleHide : t.toggleShow;
       }});
 
       form.addEventListener("submit", async (event) => {{
         event.preventDefault();
         clearError();
+        const t = translations[currentLang];
 
         if (!accessToken) {{
-          showError(
-            "Geçersiz bağlantı. Lütfen e-posta kutundan yeni bir şifre sıfırlama iste."
-          );
+          showError(t.errorInvalidLink);
           return;
         }}
 
@@ -754,20 +921,20 @@ async def reset_password_page():
         const confirm = confirmInput.value.trim();
 
         if (!password || !confirm) {{
-          showError("Lütfen tüm alanları doldur.");
+          showError(t.errorEmptyFields);
           return;
         }}
         if (password.length < 6) {{
-          showError("Şifre en az 6 karakter olmalı.");
+          showError(t.errorShortPassword);
           return;
         }}
         if (password !== confirm) {{
-          showError("Şifreler birbiriyle eşleşmiyor.");
+          showError(t.errorMismatch);
           return;
         }}
 
         submitBtn.disabled = true;
-        submitBtn.textContent = "Güncelleniyor…";
+        document.getElementById("submitText").textContent = t.submitting;
 
         try {{
           const res = await fetch(SUPABASE_URL.replace(/\\/$/, "") + "/auth/v1/user", {{
@@ -785,23 +952,24 @@ async def reset_password_page():
             const msg =
               data?.error_description ||
               data?.message ||
-              "Şifre güncellenemedi. Lütfen bağlantıyı tekrar deneyin.";
+              t.errorUpdateFailed;
             showError(msg);
             submitBtn.disabled = false;
-            submitBtn.textContent = "Şifreyi güncelle";
+            document.getElementById("submitText").textContent = t.submit;
             return;
           }}
 
-          setStatus("ok", "Şifren başarıyla güncellendi.");
-          alert(
-            "Şifren güncellendi. Artık Modli uygulamasına yeni şifrenle giriş yapabilirsin."
-          );
-          window.location.href = "https://modli.app";
+          // Formu gizle ve başarı mesajını göster
+          form.style.display = "none";
+          successMessage.classList.add("show");
+          
+          // Sayfayı yukarı kaydır
+          successMessage.scrollIntoView({{ behavior: "smooth", block: "start" }});
         }} catch (err) {{
           console.error(err);
-          showError("Bir hata oluştu. Lütfen birkaç dakika sonra tekrar dene.");
+          showError(t.errorGeneric);
           submitBtn.disabled = false;
-          submitBtn.textContent = "Şifreyi güncelle";
+          document.getElementById("submitText").textContent = t.submit;
         }}
       }});
     </script>

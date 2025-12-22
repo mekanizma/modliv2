@@ -83,12 +83,8 @@ export default function SignInScreen() {
 
     setResetLoading(true);
     try {
-      // Prod'da native deep link (modli://), dev'de Expo URL'i kullan
-      const resetLink = Platform.select({
-        ios: 'modli://reset-password',
-        android: 'modli://reset-password',
-        default: Linking.createURL('/reset-password'),
-      });
+      // Şifre sıfırlama e-postası her zaman web reset sayfasına yönlendirilsin
+      const resetLink = 'https://modli.mekanizma.com/reset-password';
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: resetLink,
       });

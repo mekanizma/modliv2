@@ -21,7 +21,7 @@ import { useLanguage } from '../src/contexts/LanguageContext';
 export default function ResetPasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t, language } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const params = useLocalSearchParams();
   const currentUrl = Linking.useURL();
   const [newPassword, setNewPassword] = useState('');
@@ -138,9 +138,14 @@ export default function ResetPasswordScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            style={styles.langButton}
+            onPress={() => setLanguage(language === 'en' ? 'tr' : 'en')}
+          >
+            <Text style={styles.langText}>{language === 'en' ? 'TR' : 'EN'}</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.header}>
           <Ionicons name="lock-open" size={32} color="#fbbf24" />
@@ -214,13 +219,21 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#1a1a2e',
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  langButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#1a1a2e',
+  },
+  langText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
   header: {
     alignItems: 'center',
