@@ -41,10 +41,36 @@ export default function TryOnScreen() {
   const spinValue = useRef(new Animated.Value(0)).current;
   const pulseValue = useRef(new Animated.Value(1)).current;
   const fadeValue = useRef(new Animated.Value(1)).current;
+  const titleScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     fetchItems();
     loadBaseImage();
+  }, []);
+
+  // Başlık animasyonu
+  useEffect(() => {
+    // Pulse animasyonu
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(titleScale, {
+          toValue: 1.05,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleScale, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulseAnimation.start();
+
+    return () => {
+      pulseAnimation.stop();
+    };
   }, []);
 
   // Start animations when generating
@@ -197,13 +223,19 @@ export default function TryOnScreen() {
       
       console.log(baseImage ? '🔄 Layering mode: Adding clothing on top of existing result' : '✨ Normal mode: Using profile photo');
       
-      const response = await axios.post(`${BACKEND_URL}/api/try-on`, {
-        user_id: user?.id,
-        user_image: userImage,
-        clothing_image: selectedItem.image_url,
-        clothing_category: selectedItem.category,
-        is_free_trial: isFreeTrial,
-      });
+      const response = await axios.post(
+        `${BACKEND_URL}/api/try-on`,
+        {
+          user_id: user?.id,
+          user_image: userImage,
+          clothing_image: selectedItem.image_url,
+          clothing_category: selectedItem.category,
+          is_free_trial: isFreeTrial,
+        },
+        {
+          timeout: 300000, // 5 dakika timeout (backend ile uyumlu)
+        }
+      );
 
       if (response.data.success) {
         const resultUrl = response.data.result_image_url || response.data.result_image;
@@ -212,6 +244,18 @@ export default function TryOnScreen() {
         }
 
         setResultImage(resultUrl);
+
+        // Save result directly to gallery in the background
+        try {
+          await axios.post(`${BACKEND_URL}/api/tryon-results`, {
+            user_id: user.id,
+            wardrobe_item_id: selectedItem.id,
+            result_image_url: resultUrl,
+          });
+        } catch (saveError) {
+          console.error('Error auto-saving result to gallery:', saveError);
+        }
+
         // Deduct credit
         await updateProfile({ credits: (profile.credits || 0) - 1 });
         await refreshProfile();
@@ -220,31 +264,35 @@ export default function TryOnScreen() {
       }
     } catch (error: any) {
       console.error('Error generating try-on:', error);
+      
+      let errorMessage = 'Failed to generate try-on';
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = language === 'en' 
+          ? 'Request timed out. The process is taking longer than expected. Please try again.'
+          : 'İstek zaman aşımına uğradı. İşlem beklenenden uzun sürüyor. Lütfen tekrar deneyin.';
+      } else if (error.response?.status === 504) {
+        errorMessage = language === 'en'
+          ? 'Server timeout. The AI processing is taking longer than expected. Please try again in a moment.'
+          : 'Sunucu zaman aşımı. AI işlemi beklenenden uzun sürüyor. Lütfen birkaç dakika sonra tekrar deneyin.';
+      } else if (error.response?.status === 503) {
+        errorMessage = language === 'en'
+          ? 'Service temporarily unavailable. Please try again in a few moments.'
+          : 'Hizmet geçici olarak kullanılamıyor. Lütfen birkaç dakika sonra tekrar deneyin.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       Alert.alert(
-        'Error',
-        error.response?.data?.detail || error.message || 'Failed to generate try-on'
+        language === 'en' ? 'Error' : 'Hata',
+        errorMessage
       );
     } finally {
       setGenerating(false);
-    }
-  };
-
-  const handleSaveResult = async () => {
-    if (!resultImage || !user || !selectedItem) return;
-
-    try {
-      await axios.post(`${BACKEND_URL}/api/tryon-results`, {
-        user_id: user.id,
-        wardrobe_item_id: selectedItem.id,
-        result_image_url: resultImage,
-      });
-
-      Alert.alert(
-        language === 'en' ? 'Saved!' : 'Kaydedildi!',
-        language === 'en' ? 'Result saved to your gallery' : 'Sonuç galerinize kaydedildi'
-      );
-    } catch (error) {
-      console.error('Error saving result:', error);
     }
   };
 
@@ -255,7 +303,16 @@ export default function TryOnScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>{t.tryOn.title}</Text>
+        <Animated.Text
+          style={[
+            styles.title,
+            {
+              transform: [{ scale: titleScale }],
+            },
+          ]}
+        >
+          {t.tryOn.title}
+        </Animated.Text>
         <View style={styles.creditsChip}>
           <Ionicons name="sparkles" size={14} color="#fbbf24" />
           <Text style={styles.creditsText}>{profile?.credits || 0}</Text>
@@ -456,9 +513,23 @@ export default function TryOnScreen() {
               <Ionicons name="refresh" size={20} color="#6366f1" />
               <Text style={styles.secondaryButtonText}>{t.tryOn.tryAnother}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryButton} onPress={handleSaveResult}>
-              <Ionicons name="download" size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>{t.tryOn.saveResult}</Text>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => {
+                router.push({
+                  pathname: '/(tabs)/gallery',
+                  params: {
+                    fromTryOn: 'true',
+                    resultUrl: resultImage || '',
+                    wardrobeItemId: selectedItem?.id || '',
+                  },
+                });
+              }}
+            >
+              <Ionicons name="images-outline" size={20} color="#fff" />
+              <Text style={styles.primaryButtonText}>
+                {language === 'en' ? 'Open Gallery' : 'Galeriyi Aç'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -506,9 +577,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '800',
     color: '#fff',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    textShadowColor: '#6366f1',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   creditsChip: {
     flexDirection: 'row',

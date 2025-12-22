@@ -25,15 +25,12 @@ import { uploadImageToStorage } from '../src/lib/storage';
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 const categories: { key: ClothingCategory; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'tops', icon: 'shirt-outline' },
-  // Alt giyim: pantolon havası veren ikon
+  { key: 'tops', icon: 'shirt' },
   { key: 'bottoms', icon: 'walk-outline' },
-  // Elbiseler: elbise/feminen silüet
   { key: 'dresses', icon: 'woman-outline' },
-  // Dış giyim: gövde/ceket hissi
   { key: 'outerwear', icon: 'body-outline' },
-  { key: 'shoes', icon: 'footsteps-outline' },
-  { key: 'accessories', icon: 'watch-outline' },
+  { key: 'shoes', icon: 'footsteps' },
+  { key: 'accessories', icon: 'bag' },
 ];
 
 const seasons: Season[] = ['summer', 'winter', 'spring', 'autumn', 'all'];
@@ -349,6 +346,23 @@ export default function AddItemScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Fullscreen loading overlay while saving */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color="#6366f1" />
+            <Text style={styles.loadingText}>
+              {language === 'en' ? 'Saving your item...' : 'Parçan kaydediliyor...'}
+            </Text>
+            <Text style={styles.loadingSubText}>
+              {language === 'en'
+                ? "Please don't close the app while we upload your photo."
+                : 'Fotoğraf yüklenirken lütfen uygulamayı kapatma.'}
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -542,5 +556,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingCard: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderRadius: 16,
+    backgroundColor: '#020617',
+    alignItems: 'center',
+    maxWidth: '80%',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#e5e7eb',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  loadingSubText: {
+    marginTop: 8,
+    color: '#9ca3af',
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

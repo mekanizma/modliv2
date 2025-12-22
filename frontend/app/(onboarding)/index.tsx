@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   Animated,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '../../src/contexts/LanguageContext';
@@ -21,6 +22,7 @@ interface SlideData {
   icon: keyof typeof Ionicons.glyphMap;
   titleKey: 'slide1Title' | 'slide2Title' | 'slide3Title';
   descKey: 'slide1Desc' | 'slide2Desc' | 'slide3Desc';
+  taglineKey: 'slide1Tagline' | 'slide2Tagline' | 'slide3Tagline';
   color: string;
 }
 
@@ -30,21 +32,24 @@ const slides: SlideData[] = [
     icon: 'shirt-outline',
     titleKey: 'slide1Title',
     descKey: 'slide1Desc',
+    taglineKey: 'slide1Tagline',
     color: '#6366f1',
   },
   {
     id: '2',
-    icon: 'grid-outline',
+    icon: 'sparkles-outline',
     titleKey: 'slide2Title',
     descKey: 'slide2Desc',
-    color: '#8b5cf6',
+    taglineKey: 'slide2Tagline',
+    color: '#a855f7',
   },
   {
     id: '3',
-    icon: 'partly-sunny-outline',
+    icon: 'cloudy-night-outline',
     titleKey: 'slide3Title',
     descKey: 'slide3Desc',
-    color: '#a855f7',
+    taglineKey: 'slide3Tagline',
+    color: '#22c55e',
   },
 ];
 
@@ -73,13 +78,53 @@ export default function OnboardingScreen() {
     router.replace('/(auth)');
   };
 
-  const renderSlide = ({ item, index }: { item: SlideData; index: number }) => (
+  const renderSlide = ({ item }: { item: SlideData; index: number }) => (
     <View style={[styles.slide, { width }]}>
-      <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
-        <Ionicons name={item.icon} size={100} color={item.color} />
+      <View style={styles.card}>
+        <View
+          style={[
+            styles.imageContainer,
+            {
+              borderColor: item.color,
+              shadowColor: item.color,
+            },
+          ]}
+        >
+          {item.id === '1' ? (
+            <Image
+              source={{
+                uri: 'https://liftapp.ai/_next/static/media/whyLift.395ef2d8.webp',
+              }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : item.id === '2' ? (
+            <Image
+              source={{
+                uri: 'https://liftapp.ai/_next/static/media/whyLift.4634b40b.webp',
+              }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : item.id === '3' ? (
+            <Image
+              source={require('../../assets/onboarding-wardrobe.png')}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imageOverlay}>
+              <Ionicons name={item.icon} size={96} color="#fff" />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.textBlock}>
+          <Text style={styles.tagline}>{t.onboarding[item.taglineKey]}</Text>
+          <Text style={styles.title}>{t.onboarding[item.titleKey]}</Text>
+          <Text style={styles.description}>{t.onboarding[item.descKey]}</Text>
+        </View>
       </View>
-      <Text style={styles.title}>{t.onboarding[item.titleKey]}</Text>
-      <Text style={styles.description}>{t.onboarding[item.descKey]}</Text>
     </View>
   );
 
@@ -118,9 +163,6 @@ export default function OnboardingScreen() {
           <Text style={styles.skipText}>{t.onboarding.skip}</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Welcome Text */}
-      <Text style={styles.welcome}>{t.onboarding.welcome}</Text>
 
       {/* Slides */}
       <FlatList
@@ -203,7 +245,7 @@ const styles = StyleSheet.create({
   slide: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: 16,
   },
   iconContainer: {
     width: 200,
@@ -217,13 +259,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 16,
   },
   description: {
     fontSize: 16,
     color: '#9ca3af',
-    textAlign: 'center',
+    textAlign: 'left',
     lineHeight: 24,
   },
   pagination: {
@@ -237,6 +279,52 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#6366f1',
     marginHorizontal: 4,
+  },
+  card: {
+    backgroundColor: '#111827',
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 12,
+  },
+  imageContainer: {
+    width: '92%',
+    alignSelf: 'center',
+    aspectRatio: 3 / 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 24,
+    backgroundColor: '#020617',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageOverlay: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  textBlock: {
+    width: '100%',
+    alignItems: 'flex-start',
+  },
+  tagline: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#a5b4fc',
+    marginBottom: 8,
   },
   button: {
     flexDirection: 'row',

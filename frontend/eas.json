@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 13.2.0"
+    "version": ">= 13.2.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -16,16 +17,22 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_URL": "https://modli.mekanizma.com"
+        "EXPO_PUBLIC_BACKEND_URL": "https://modli.mekanizma.com",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://cgbyhxployzpxwixgqzs.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNnYnloeHBsb3l6cHh3aXhncXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4OTI4NjIsImV4cCI6MjA4MTQ2ODg2Mn0.oX3Xlf4niVoAUT5mreZ2sSm9wVUbiVJp2m2jzNnTrS8"
       }
     },
     "production": {
       "autoIncrement": true,
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_BACKEND_URL": "https://modli.mekanizma.com",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your_supabase_anon_key_here",
-        "EXPO_PUBLIC_OPENWEATHER_API_KEY": "your_openweather_api_key_here"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://cgbyhxployzpxwixgqzs.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNnYnloeHBsb3l6cHh3aXhncXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4OTI4NjIsImV4cCI6MjA4MTQ2ODg2Mn0.oX3Xlf4niVoAUT5mreZ2sSm9wVUbiVJp2m2jzNnTrS8",
+        "EXPO_PUBLIC_OPENWEATHER_API_KEY": "8eb7f79142dbe8f173e1c81e85853fbc"
       }
     }
   },
@@ -43,4 +50,3 @@
     }
   }
 }
-

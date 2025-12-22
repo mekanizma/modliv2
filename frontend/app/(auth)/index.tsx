@@ -16,6 +16,7 @@ import { useRouter, Link } from 'expo-router';
 import { useLanguage } from '../../src/contexts/LanguageContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../../src/lib/supabase';
@@ -82,8 +83,14 @@ export default function SignInScreen() {
 
     setResetLoading(true);
     try {
+      // Prod'da native deep link (modli://), dev'de Expo URL'i kullan
+      const resetLink = Platform.select({
+        ios: 'modli://reset-password',
+        android: 'modli://reset-password',
+        default: Linking.createURL('/reset-password'),
+      });
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'https://mekanizma.com/modli/index.html',
+        redirectTo: resetLink,
       });
 
       if (error) {
@@ -124,9 +131,14 @@ export default function SignInScreen() {
       if (rememberMe) {
         await AsyncStorage.setItem('savedEmail', email);
         await AsyncStorage.setItem('rememberMe', 'true');
+        // Session zaten Supabase tarafından otomatik olarak SecureStore'da saklanıyor
+        // persistSession: true ayarı sayesinde
       } else {
         await AsyncStorage.removeItem('savedEmail');
         await AsyncStorage.setItem('rememberMe', 'false');
+        // Eğer "Beni Hatırla" kapalıysa, çıkış yapıldığında session'ı temizle
+        // Ancak şu anki giriş için session'ı sakla (kullanıcı deneyimi için)
+        // Çıkış yapıldığında session zaten temizlenecek
       }
 
       console.log('🔑 Attempting sign in...');

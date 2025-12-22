@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS } from '../../src/types';
 import * as ImagePicker from 'expo-image-picker';
+import { ensureDailyOutfitReminderScheduled, getNotificationsEnabled, setNotificationsEnabled } from '../../src/lib/notifications';
 
 const { width, height } = Dimensions.get('window');
 
@@ -34,6 +35,17 @@ export default function ProfileScreen() {
   const [updatingAvatar, setUpdatingAvatar] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const enabled = await getNotificationsEnabled();
+        setNotificationsEnabled(enabled);
+      } catch (error) {
+        console.warn('Failed to load notifications preference', error);
+      }
+    })();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -322,7 +334,16 @@ export default function ProfileScreen() {
           rightElement={
             <Switch
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={async (value) => {
+                setNotificationsEnabled(value);
+                if (value) {
+                  await setNotificationsEnabled(true);
+                  // Kullanıcı bildirimleri açtığında günlük 07:30 bildirimi planla
+                  await ensureDailyOutfitReminderScheduled(language);
+                } else {
+                  await setNotificationsEnabled(false);
+                }
+              }}
               trackColor={{ false: '#2d2d44', true: '#6366f1' + '60' }}
               thumbColor={notificationsEnabled ? '#6366f1' : '#6b7280'}
             />

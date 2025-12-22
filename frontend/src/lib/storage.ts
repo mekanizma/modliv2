@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { EXPO_PUBLIC_BACKEND_URL } from '@env';
 
 export interface UploadResult {
   success: boolean;
@@ -20,6 +19,8 @@ export async function uploadImageToStorage(
   mimeType: string = 'image/jpeg'
 ): Promise<UploadResult> {
   try {
+    const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL as string;
+
     const formData = new FormData();
     formData.append('file', {
       uri: fileUri,

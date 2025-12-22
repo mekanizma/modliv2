@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useLanguage } from '../../src/contexts/LanguageContext';
@@ -89,7 +90,10 @@ export default function SignUpScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Ionicons name="person-add" size={50} color="#6366f1" />
+            <Image 
+              source={require('../../assets/images/modli-logo.png')} 
+              style={styles.logo}
+            />
           </View>
           <Text style={styles.title}>{t.auth.createAccount}</Text>
         </View>
@@ -100,7 +104,7 @@ export default function SignUpScreen() {
             <Ionicons name="person-outline" size={20} color="#6b7280" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Full Name"
+              placeholder={t.auth.fullName}
               placeholderTextColor="#6b7280"
               value={fullName}
               onChangeText={setFullName}
@@ -209,6 +213,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 24,
   },
   title: {
     fontSize: 28,

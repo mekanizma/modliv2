@@ -23,6 +23,32 @@ export default function SubscriptionScreen() {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [purchasing, setPurchasing] = useState(false);
 
+  const getPlanTagline = (planId: string) => {
+    if (language === 'en') {
+      switch (planId) {
+        case 'basic':
+          return 'Take your first step into the fashion world. Bring your wardrobe pieces to life with AI and start discovering your style.';
+        case 'standard':
+          return 'Perfect style for every day! Plan your weekly outfits in seconds and end the "what should I wear" dilemma every morning.';
+        case 'premium':
+          return 'For style enthusiasts who push boundaries! Have your personal style consultant with you at all times, shine every day with unlimited creativity.';
+        default:
+          return '';
+      }
+    } else {
+      switch (planId) {
+        case 'basic':
+          return 'Moda dünyasına ilk adımı atın. Gardırobunuzdaki parçaları yapay zeka ile canlandırın ve stilinizi keşfetmeye başlayın.';
+        case 'standard':
+          return 'Her güne kusursuz bir stil! Haftalık kombinlerinizi saniyeler içinde planlayın ve her sabah "ne giyeceğim" derdine son verin.';
+        case 'premium':
+          return 'Sınırları zorlayan stil tutkunları için! Kişisel stil danışmanınız her an yanınızda olsun, sınırsız yaratıcılıkla her gün ışıldayın.';
+        default:
+          return '';
+      }
+    }
+  };
+
   const handlePurchase = async () => {
     if (!selectedPlan) return;
 
@@ -33,8 +59,8 @@ export default function SubscriptionScreen() {
     Alert.alert(
       language === 'en' ? 'Payment' : 'Ödeme',
       language === 'en'
-        ? `This would charge ${selectedPlan.price_usd} USD (${selectedPlan.price_try} TL) for ${selectedPlan.credits} credits`
-        : `${selectedPlan.credits} kredi için ${selectedPlan.price_try} TL ($${selectedPlan.price_usd}) tahsil edilecektir`,
+        ? `This would charge $${selectedPlan.price_usd} for ${selectedPlan.credits} credits`
+        : `${selectedPlan.credits} kredi için ${selectedPlan.price_try} TL tahsil edilecektir`,
       [
         { text: t.common.cancel, style: 'cancel', onPress: () => setPurchasing(false) },
         {
@@ -137,10 +163,16 @@ export default function SubscriptionScreen() {
                 <Text style={styles.planCredits}>
                   {plan.credits} {t.subscription.images}
                 </Text>
+                <Text style={styles.planTagline}>
+                  {getPlanTagline(plan.id)}
+                </Text>
               </View>
               <View style={styles.planPrice}>
-                <Text style={styles.priceUsd}>${plan.price_usd}</Text>
-                <Text style={styles.priceTry}>{plan.price_try} TL</Text>
+                <Text style={styles.priceMain}>
+                  {language === 'en'
+                    ? `$${plan.price_usd}`
+                    : `${plan.price_try} TL`}
+                </Text>
               </View>
             </View>
 
@@ -156,18 +188,53 @@ export default function SubscriptionScreen() {
         <View style={styles.featuresSection}>
           <Text style={styles.featuresTitle}>{t.subscription.features}</Text>
           
-          <View style={styles.featureItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-            <Text style={styles.featureText}>{t.subscription.unlimitedWardrobe}</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-            <Text style={styles.featureText}>{t.subscription.aiTryOn}</Text>
-          </View>
-          <View style={styles.featureItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
-            <Text style={styles.featureText}>{t.subscription.weatherAlerts}</Text>
-          </View>
+          {language === 'tr' ? (
+            <>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Sınırsız Dijital Gardırop: Tüm kıyafetlerinizi cebinizde taşıyın, istediğiniz yerden erişin.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Gelişmiş AI Prova Odası: Kıyafetleri üzerinizde görmeden satın alma riskini bitirin.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Akıllı Hava Durumu Entegrasyonu: Yağmura veya soğuğa yakalanmayın; hava durumuna en uygun kombin önerileri.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Vücut Tipine Özel Analiz: Sadece size en çok yakışacak kesimleri ve modelleri keşfedin.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Renk Uyumu Asistanı: Birbiriyle en uyumlu renkleri yapay zeka ile anında eşleştirin.</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Unlimited Digital Wardrobe: Carry all your clothes in your pocket, access from anywhere.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Advanced AI Fitting Room: Eliminate the risk of buying clothes without seeing them on you.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Smart Weather Integration: Don't get caught in rain or cold; outfit suggestions tailored to weather conditions.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Body Type-Specific Analysis: Discover only the cuts and models that suit you best.</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                <Text style={styles.featureText}>Color Harmony Assistant: Instantly match the most harmonious colors with AI.</Text>
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -185,7 +252,9 @@ export default function SubscriptionScreen() {
             {purchasing
               ? (language === 'en' ? 'Processing...' : 'İşleniyor...')
               : selectedPlan
-              ? `${language === 'en' ? 'Purchase' : 'Satın Al'} - $${selectedPlan.price_usd}`
+              ? language === 'en'
+                ? `Purchase - $${selectedPlan.price_usd}`
+                : `Satın Al - ${selectedPlan.price_try} TL`
               : (language === 'en' ? 'Select a Plan' : 'Plan Seçin')}
           </Text>
         </TouchableOpacity>
@@ -293,18 +362,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
+  planTagline: {
+    color: '#e5e7eb',
+    fontSize: 12,
+    marginTop: 4,
+  },
   planPrice: {
     alignItems: 'flex-end',
   },
-  priceUsd: {
+  priceMain: {
     color: '#fff',
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  priceTry: {
-    color: '#6b7280',
-    fontSize: 12,
-    marginTop: 2,
   },
   selectedCheck: {
     position: 'absolute',

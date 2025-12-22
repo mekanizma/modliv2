@@ -43,3 +43,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+// Global error handler for invalid refresh tokens
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'TOKEN_REFRESHED' && !session) {
+    console.log('🔄 Token refresh failed, session cleared');
+    // Invalid token durumunda oturumu temizle
+    supabase.auth.signOut().catch((err) => {
+      console.error('Error signing out after token refresh failure:', err);
+    });
+  }
+});

@@ -4,11 +4,17 @@ export const translations = {
     onboarding: {
       welcome: 'Welcome to Modli',
       slide1Title: 'Virtual Try-On',
-      slide1Desc: 'See how clothes look on you without trying them on',
-      slide2Title: 'Digital Wardrobe',
-      slide2Desc: 'Organize your entire wardrobe in one place',
-      slide3Title: 'Weather Smart',
-      slide3Desc: 'Get outfit suggestions based on weather',
+      slide1Desc:
+        'Watch your style transform instantly. Pick a photo, choose an outfit, and see it on you in seconds.',
+      slide1Tagline: 'Simple & Intuitive',
+      slide2Title: 'AI Editing',
+      slide2Desc:
+        'Discover limitless transformation options. Get ultra-realistic, professional results for every change.',
+      slide2Tagline: 'Ultra-Realistic Results',
+      slide3Title: 'Smart Wardrobe & Suggestions',
+      slide3Desc:
+        'Organize your digital wardrobe and get personalized outfit ideas based on the weather and your style.',
+      slide3Tagline: 'Always Ready to Wear',
       getStarted: 'Get Started',
       next: 'Next',
       skip: 'Skip',
@@ -20,6 +26,12 @@ export const translations = {
       email: 'Email',
       password: 'Password',
       confirmPassword: 'Confirm Password',
+        newPassword: 'New Password',
+        updatePassword: 'Update Password',
+        resetPasswordTitle: 'Reset Password',
+        resetInstruction: 'Enter a new password to regain access',
+        passwordUpdated: 'Password updated',
+      fullName: 'Full Name',
       forgotPassword: 'Forgot Password?',
       orContinueWith: 'Or continue with',
       google: 'Google',
@@ -52,10 +64,24 @@ export const translations = {
       greeting: 'Hello',
       weather: 'Weather',
       todaySuggestion: "Today's Suggestion",
-      tryOn: 'Try On',
+      tryOn: 'TRY OUTFIT',
       viewWardrobe: 'View Wardrobe',
       upgrade: 'Upgrade to Premium',
       creditsLeft: 'Credits Left',
+      subGreetingMessages: [
+        'Stand out with your style',
+        'Take your style to the next level',
+        'Shine in every setting',
+        'Let your style speak',
+        'Discover fashion with Modli',
+        'Say goodbye to wardrobe chaos',
+      ],
+      statsMessages: [
+        'people created new outfits today',
+        'people added items to their wardrobe today',
+        'people discovered their style today',
+        'people shared their looks today',
+      ],
     },
     // Wardrobe
     wardrobe: {
@@ -76,6 +102,9 @@ export const translations = {
       allSeasons: 'All Seasons',
       empty: 'Your wardrobe is empty',
       addFirst: 'Add your first item',
+      openWardrobe: 'Open Wardrobe',
+      virtualWardrobe: 'VIRTUAL WARDROBE',
+      openCabinet: 'Open Cabinet',
     },
     // Add Item
     addItem: {
@@ -90,7 +119,7 @@ export const translations = {
     },
     // Try On
     tryOn: {
-      title: 'Virtual Try-On',
+      title: 'VIRTUAL TRY-ON CABIN',
       selectItem: 'Select an item to try on',
       generate: 'Generate Look',
       generating: 'Creating your look...',
@@ -114,6 +143,17 @@ export const translations = {
       aiTryOn: 'AI Try-On generations',
       weatherAlerts: 'Weather alerts',
       prioritySupport: 'Priority support',
+    },
+    // Gallery
+    gallery: {
+      title: 'My Gallery',
+      all: 'All',
+      today: 'Today',
+      thisWeek: 'This Week',
+      thisMonth: 'This Month',
+      searchPlaceholder: 'Search by item name...',
+      noResults: 'No results found',
+      clearFilters: 'Clear Filters',
     },
     // Settings
     settings: {
@@ -142,11 +182,17 @@ export const translations = {
     onboarding: {
       welcome: "Modli'ye Hoş Geldiniz",
       slide1Title: 'Sanal Deneme',
-      slide1Desc: 'Kıyafetleri giymeden üzerinizde nasıl göründüğünü görün',
-      slide2Title: 'Dijital Gardrop',
-      slide2Desc: 'Tüm gardrobunuzu tek bir yerde organize edin',
-      slide3Title: 'Hava Durumu Akıllı',
-      slide3Desc: 'Hava durumuna göre kıyafet önerileri alın',
+      slide1Desc:
+        'Stilinizin anında dönüşümünü izleyin. Bir fotoğraf seçin, kıyafet seçin ve saniyeler içinde üzerinizde görün.',
+      slide1Tagline: 'Basit ve Sezgisel',
+      slide2Title: 'Yapay Zeka Düzenleme',
+      slide2Desc:
+        'Sınırsız dönüşüm imkanlarını keşfedin. Her dönüşüm için ultra-gerçekçi, profesyonel sonuçlar alın.',
+      slide2Tagline: 'Ultra-Gerçekçi Sonuçlar',
+      slide3Title: 'Akıllı Gardırop ve Öneriler',
+      slide3Desc:
+        'Dijital gardrobunu düzenle, hava durumuna ve stiline göre kişiselleştirilmiş kombin önerileri al.',
+      slide3Tagline: 'Her Zaman Hazırsın',
       getStarted: 'Başla',
       next: 'İleri',
       skip: 'Atla',
@@ -158,6 +204,12 @@ export const translations = {
       email: 'E-posta',
       password: 'Şifre',
       confirmPassword: 'Şifreyi Onayla',
+        newPassword: 'Yeni Şifre',
+        updatePassword: 'Şifreyi Güncelle',
+        resetPasswordTitle: 'Şifre Sıfırla',
+        resetInstruction: 'Erişim için yeni şifreni belirle',
+        passwordUpdated: 'Şifre güncellendi',
+      fullName: 'İsim Soyisim',
       forgotPassword: 'Şifremi Unuttum',
       orContinueWith: 'Veya devam et',
       google: 'Google',
@@ -190,10 +242,24 @@ export const translations = {
       greeting: 'Merhaba',
       weather: 'Hava Durumu',
       todaySuggestion: 'Bugünün Önerisi',
-      tryOn: 'Dene',
+      tryOn: 'KOMBİN DENE',
       viewWardrobe: 'Gardrobu Gör',
       upgrade: "Premium'a Yükselt",
       creditsLeft: 'Kalan Kredi',
+      subGreetingMessages: [
+        'Tarzınla fark yarat',
+        'Stilini bir üst seviyeye taşı',
+        'Her ortamda göz kamaştır',
+        'Tarzın konuşsun',
+        "Modayı Modli'yle keşfet",
+        'Karmaşık gardırop derdine son ver',
+      ],
+      statsMessages: [
+        'kişi bugün yeni kombin yaptı',
+        'kişi bugün gardrobuna parça ekledi',
+        'kişi bugün tarzını keşfetti',
+        'kişi bugün görünümünü paylaştı',
+      ],
     },
     // Wardrobe
     wardrobe: {
@@ -214,6 +280,9 @@ export const translations = {
       allSeasons: 'Tüm Mevsimler',
       empty: 'Gardrobunuz boş',
       addFirst: 'İlk parçanızı ekleyin',
+      openWardrobe: 'Dolabı Aç',
+      virtualWardrobe: 'SANAL GARDROP',
+      openCabinet: 'KAPAĞI AÇ',
     },
     // Add Item
     addItem: {
@@ -228,7 +297,7 @@ export const translations = {
     },
     // Try On
     tryOn: {
-      title: 'Sanal Deneme',
+      title: 'SANAL DENEME KABİNİ',
       selectItem: 'Denemek için bir parça seçin',
       generate: 'Görünümü Oluştur',
       generating: 'Görünümünüz oluşturuluyor...',
@@ -252,6 +321,17 @@ export const translations = {
       aiTryOn: 'AI deneme oluşturma',
       weatherAlerts: 'Hava durumu uyarıları',
       prioritySupport: 'Öncelikli destek',
+    },
+    // Gallery
+    gallery: {
+      title: 'Galerim',
+      all: 'Tümü',
+      today: 'Bugün',
+      thisWeek: 'Bu Hafta',
+      thisMonth: 'Bu Ay',
+      searchPlaceholder: 'Parça ismine göre ara...',
+      noResults: 'Sonuç bulunamadı',
+      clearFilters: 'Filtreleri Temizle',
     },
     // Settings
     settings: {

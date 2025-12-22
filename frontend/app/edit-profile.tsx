@@ -86,7 +86,7 @@ export default function EditProfileScreen() {
         {/* Full Name */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>
-            {language === 'en' ? 'Full Name' : 'Ad Soyad'}
+            {language === 'en' ? 'Full Name' : 'İsim Soyisim'}
           </Text>
           <TextInput
             style={styles.input}

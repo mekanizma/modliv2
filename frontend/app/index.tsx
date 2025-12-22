@@ -9,6 +9,26 @@ export default function Index() {
   const { session, profile, loading } = useAuth();
   const [hasNavigated, setHasNavigated] = useState(false);
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
+  const [timeoutReached, setTimeoutReached] = useState(false);
+
+  // Timeout mekanizması - 12 saniye sonra zorla kontrol (session/profile takılı kalırsa)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (hasNavigated) return;
+      console.log('⏰ Timeout reached (failsafe), forcing navigation check...');
+      setTimeoutReached(true);
+      checkNavigation();
+    }, 12000);
+
+    return () => clearTimeout(timeout);
+  }, [hasNavigated, loading]);
+
+  // Timeout tetiklendikten sonra (veya state güncellendikten sonra) yeniden dene
+  useEffect(() => {
+    if (!timeoutReached) return;
+    if (hasNavigated) return;
+    checkNavigation();
+  }, [timeoutReached, hasNavigated, session, profile, loading]);
 
   // Reset hasNavigated only when user ID actually changes (login/logout)
   useEffect(() => {
@@ -21,16 +41,21 @@ export default function Index() {
       });
       setLastSessionId(currentSessionId);
       setHasNavigated(false);
+      setTimeoutReached(false);
     }
   }, [session?.user?.id]);
 
   useEffect(() => {
-    // Don't navigate if already navigated or still loading
-    if (hasNavigated || loading) {
+    // Don't navigate if already navigated
+    if (hasNavigated) {
       return;
     }
     
-    checkNavigation();
+    // Session yüklenene kadar bekle (loading false olana kadar)
+    // Sadece loading false olduğunda ve session kontrolü yapıldığında yönlendir
+    if (!loading) {
+      checkNavigation();
+    }
   }, [loading, session, profile, hasNavigated]);
 
   const checkNavigation = async () => {
@@ -62,18 +87,28 @@ export default function Index() {
       }
 
       // Wait for profile to load (but not indefinitely)
-      if (!profile) {
+      // Timeout'a ulaşıldıysa profile olmasa bile devam et
+      if (!profile && !timeoutReached) {
         console.log('⏳ Waiting for profile to load...');
         return;
       }
 
+      // Timeout'a ulaşıldıysa ve profile yoksa, session varsa ana ekrana git
+      // Profile yüklenene kadar bekleyebiliriz
+      if (!profile && timeoutReached) {
+        console.log('⏰ Timeout reached, profile not loaded but session exists → Navigating to main app');
+        setHasNavigated(true);
+        setTimeout(() => router.replace('/(tabs)'), 50);
+        return;
+      }
+
       // Logged in but profile not complete - show profile setup
-      if (profile.onboarding_completed === false) {
+      if (profile?.onboarding_completed === false) {
         console.log('👤 Profile incomplete → Showing profile setup');
         console.log('Profile data:', { 
-          id: profile.id, 
-          email: profile.email,
-          onboarding_completed: profile.onboarding_completed 
+          id: profile?.id, 
+          email: profile?.email,
+          onboarding_completed: profile?.onboarding_completed 
         });
         setHasNavigated(true);
         setTimeout(() => router.replace('/profile-setup'), 50);

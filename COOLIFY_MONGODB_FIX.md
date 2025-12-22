@@ -280,3 +280,10 @@ Deployment başarılı olduysa:
 - [ ] Mobil uygulamadan API erişimi çalışıyor
 
 **Hepsi ✅ ise tebrikler, deployment başarılı!** 🎉
+
+
+
+
+
+
+
