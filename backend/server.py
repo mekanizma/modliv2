@@ -1041,8 +1041,21 @@ async def reset_password_page():
             return;
           }}
 
-          // Formu gizle ve başarı mesajını göster
+          // Formu ve diğer metinleri gizle, sadece teşekkürler mesajını göster
           form.style.display = "none";
+
+          const chipRow = document.querySelector(".chip-row");
+          if (chipRow) chipRow.style.display = "none";
+
+          const headline = document.getElementById("headline");
+          if (headline) headline.style.display = "none";
+
+          const subcopy = document.getElementById("subcopyText");
+          if (subcopy) subcopy.style.display = "none";
+
+          const badgeRow = document.querySelector(".badge-row");
+          if (badgeRow) badgeRow.style.display = "none";
+
           successMessage.classList.add("show");
           
           // Sayfayı yukarı kaydır

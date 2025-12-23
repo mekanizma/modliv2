@@ -33,7 +33,7 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [resetLoading, setResetLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<'google' | null>(null);
 
   // Load saved credentials
   useEffect(() => {
@@ -162,7 +162,7 @@ export default function SignInScreen() {
     }
   };
 
-  const handleOAuthSignIn = async (provider: 'google' | 'apple') => {
+  const handleOAuthSignIn = async (provider: 'google') => {
     setOauthLoading(provider);
     try {
       const { error } = await signInWithOAuth(provider);
@@ -308,20 +308,6 @@ export default function SignInScreen() {
               <>
                 <Ionicons name="logo-google" size={24} color="#fff" />
                 <Text style={styles.socialButtonText}>{t.auth.google}</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.socialButton, oauthLoading === 'apple' && styles.socialButtonDisabled]}
-            onPress={() => handleOAuthSignIn('apple')}
-            disabled={oauthLoading !== null}
-          >
-            {oauthLoading === 'apple' ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="logo-apple" size={24} color="#fff" />
-                <Text style={styles.socialButtonText}>{t.auth.apple}</Text>
               </>
             )}
           </TouchableOpacity>
