@@ -3,7 +3,8 @@ WORKDIR /app
 
 # Bağımlılıkları kopyala ve kur
 COPY package*.json ./
-RUN npm ci --no-fund --no-audit
+# package-lock yoksa ci hata verir; bu nedenle install kullanıyoruz
+RUN npm install --no-fund --no-audit
 
 # Kaynakları kopyala ve üretim build'i al
 COPY . .
