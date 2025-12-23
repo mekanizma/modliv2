@@ -71,7 +71,7 @@ export default function NotificationForm({ users, onSend, loading, error }: Prop
           {loading ? 'Gönderiliyor…' : 'Gönder'}
         </button>
         <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-          Not: Backend tarafındaki push servisi placeholder, gerçek gönderim için Expo/FCM entegrasyonu gerekir.
+          Not: Bildirimler kayıtlı push token’lara Expo Push ile gönderilir.
         </p>
       </form>
     </div>

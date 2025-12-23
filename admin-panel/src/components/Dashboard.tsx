@@ -6,6 +6,8 @@ type Props = {
   adminEmail: string;
   onLogout: () => void;
   users: UserProfile[];
+  totalUsers: number;
+  page: number;
   usersLoading: boolean;
   usersError: Error | null;
   stats?: Stats;
@@ -13,6 +15,8 @@ type Props = {
   statsError: Error | null;
   onUpdateCredits: (userId: string, credits: number) => void;
   onSendNotification: (title: string, body: string, userId?: string | null) => void;
+  onSearchChange: (value: string) => void;
+  onPageChange: (page: number) => void;
   creditUpdating: boolean;
   notificationSending: boolean;
   notificationError: Error | null;
@@ -22,6 +26,8 @@ export default function Dashboard({
   adminEmail,
   onLogout,
   users,
+  totalUsers,
+  page,
   usersLoading,
   usersError,
   stats,
@@ -29,6 +35,8 @@ export default function Dashboard({
   statsError,
   onUpdateCredits,
   onSendNotification,
+  onSearchChange,
+  onPageChange,
   creditUpdating,
   notificationSending,
   notificationError
@@ -105,7 +113,11 @@ export default function Dashboard({
         ) : (
           <UserTable
             users={users}
+            total={totalUsers}
+            page={page}
             onUpdateCredits={onUpdateCredits}
+            onSearchChange={onSearchChange}
+            onPageChange={onPageChange}
             updating={creditUpdating}
           />
         )}

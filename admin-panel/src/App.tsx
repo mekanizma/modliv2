@@ -27,12 +27,20 @@ function persistSession(session: AdminSession | null) {
 export default function App() {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<AdminSession | null>(() => loadSession());
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
 
-  const { data: users, isLoading: usersLoading, error: usersError } = useQuery<UserProfile[]>({
-    queryKey: ['users', session?.token],
-    queryFn: () => fetchUsers(session!.token),
+  const {
+    data: usersResponse,
+    isLoading: usersLoading,
+    error: usersError,
+  } = useQuery({
+    queryKey: ['users', session?.token, page, search],
+    queryFn: () => fetchUsers({ token: session!.token, page, pageSize: 10, search }),
     enabled: Boolean(session?.token)
   });
+  const users = usersResponse?.users || [];
+  const totalUsers = usersResponse?.total || 0;
 
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<Stats>({
     queryKey: ['stats', session?.token],
@@ -79,6 +87,15 @@ export default function App() {
   const handleSendNotification = (title: string, body: string, userId?: string | null) =>
     notificationMutation.mutate({ title, body, userId });
 
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
   useEffect(() => {
     if (!session) return;
     persistSession(session);
@@ -98,6 +115,8 @@ export default function App() {
         adminEmail={session.email}
         onLogout={handleLogout}
         users={users || []}
+        totalUsers={totalUsers}
+        page={page}
         usersLoading={usersLoading}
         usersError={usersError as Error | null}
         stats={stats}
@@ -105,6 +124,8 @@ export default function App() {
         statsError={statsError as Error | null}
         onUpdateCredits={handleCreditChange}
         onSendNotification={handleSendNotification}
+        onSearchChange={handleSearchChange}
+        onPageChange={handlePageChange}
         creditUpdating={creditMutation.isPending}
         notificationSending={notificationMutation.isPending}
         notificationError={notificationMutation.error as Error | null}

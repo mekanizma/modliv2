@@ -8,6 +8,13 @@ export type UserProfile = {
   created_at?: string;
 };
 
+export type PaginatedUsers = {
+  users: UserProfile[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 export type Stats = {
   users: {
     total: number;

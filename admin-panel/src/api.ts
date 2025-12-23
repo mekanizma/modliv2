@@ -46,12 +46,33 @@ export async function adminLogin(email: string, password: string): Promise<Admin
   }
 }
 
-export async function fetchUsers(token: string): Promise<UserProfile[]> {
+export async function fetchUsers(params: {
+  token: string;
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}): Promise<{ users: UserProfile[]; total: number; page: number; pageSize: number }> {
+  const { token, page = 1, pageSize = 10, search } = params;
   try {
-    const { data } = await api.get<{ users: UserProfile[] }>('/api/admin/users', {
-      headers: buildHeaders(token)
+    const { data } = await api.get<{
+      users: UserProfile[];
+      total?: number;
+      page?: number;
+      page_size?: number;
+    }>('/api/admin/users', {
+      headers: buildHeaders(token),
+      params: {
+        page,
+        page_size: pageSize,
+        q: search || undefined
+      }
     });
-    return data.users || [];
+    return {
+      users: data.users || [],
+      total: data.total ?? (data.users ? data.users.length : 0),
+      page: data.page ?? page,
+      pageSize: data.page_size ?? pageSize
+    };
   } catch (error) {
     handleError(error);
   }

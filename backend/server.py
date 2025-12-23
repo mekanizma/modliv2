@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta
 import httpx
@@ -32,6 +32,8 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'modli-admin-secret-token-change-in-production')
+EXPO_ACCESS_TOKEN = os.environ.get('EXPO_ACCESS_TOKEN', '')
+PUSH_TOKEN_TABLE = os.environ.get('PUSH_TOKEN_TABLE', 'push_tokens')
 
 # Admin Credentials
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'modli@mekanizma.com')
@@ -53,6 +55,11 @@ app = FastAPI()
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
+
+
+# Push notification defaults
+EXPO_PUSH_API_URL = "https://exp.host/--/api/v2/push/send"
+EXPO_MAX_BATCH = 90
 
 
 # Utility Functions
@@ -88,6 +95,131 @@ def base64_to_bytes(base64_string: str) -> bytes:
 def bytes_to_base64(image_bytes: bytes) -> str:
     """Convert bytes to base64 string"""
     return f"data:image/jpeg;base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+
+
+def chunk_list(items: List[Any], size: int) -> List[List[Any]]:
+    """Yield successive chunks from a list"""
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+def is_expo_push_token(token: str) -> bool:
+    """Basic validation for Expo push tokens"""
+    return isinstance(token, str) and (
+        token.startswith("ExponentPushToken") or token.startswith("ExpoPushToken")
+    )
+
+
+async def fetch_push_tokens_from_supabase(target_user_id: Optional[str] = None) -> List[str]:
+    """
+    Supabase REST üzerinden push token listesini döndürür.
+    Varsayılan tablo adı: push_tokens (PUSH_TOKEN_TABLE env ile değiştirilebilir)
+    """
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise HTTPException(status_code=500, detail="Supabase push token erişimi için yapılandırma eksik")
+
+    rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/{PUSH_TOKEN_TABLE}"
+
+    params = {
+        "select": "user_id,push_token,platform,updated_at",
+        "push_token": "not.is.null",
+    }
+
+    if target_user_id:
+        params["user_id"] = f"eq.{target_user_id}"
+
+    async with httpx.AsyncClient(timeout=20.0) as http_client:
+        resp = await http_client.get(
+            rest_url,
+            params=params,
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+            },
+        )
+
+    if resp.status_code != 200:
+        error_detail = resp.text[:200] if resp.text else "Unknown error"
+        logger.error(f"Push token fetch failed: {resp.status_code} - {error_detail}")
+        raise HTTPException(status_code=500, detail="Push tokenları okunamadı")
+
+    data = resp.json()
+    tokens = []
+    for row in data:
+        token = row.get("push_token")
+        if token and is_expo_push_token(token):
+            tokens.append(token)
+        elif token:
+            logger.warning(f"Geçersiz push token formatı atlandı: {token}")
+
+    # Benzersiz tut
+    return list(dict.fromkeys(tokens))
+
+
+async def send_expo_push_notifications(
+    tokens: List[str], title: str, body: str, data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Expo Push API üzerinden bildirim gönderir.
+    """
+    if not tokens:
+        return {"sent": [], "failed": [], "errors": ["Kayıtlı push token yok"]}
+
+    messages = [
+        {
+            "to": token,
+            "sound": "default",
+            "title": title,
+            "body": body,
+            "data": data or {},
+        }
+        for token in tokens
+        if is_expo_push_token(token)
+    ]
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    if EXPO_ACCESS_TOKEN:
+        headers["Authorization"] = f"Bearer {EXPO_ACCESS_TOKEN}"
+
+    sent_tokens: List[str] = []
+    failed: List[Dict[str, Any]] = []
+    errors: List[str] = []
+
+    async with httpx.AsyncClient(timeout=20.0) as http_client:
+        for chunk in chunk_list(messages, EXPO_MAX_BATCH):
+            try:
+                resp = await http_client.post(EXPO_PUSH_API_URL, json=chunk, headers=headers)
+            except Exception as exc:
+                logger.error(f"Expo push gönderim hatası: {str(exc)}")
+                errors.append(str(exc))
+                continue
+
+            if resp.status_code != 200:
+                error_detail = resp.text[:200] if resp.text else "Unknown error"
+                logger.error(f"Expo push API hatası: {resp.status_code} - {error_detail}")
+                failed.extend({"token": msg.get("to"), "error": error_detail} for msg in chunk)
+                continue
+
+            resp_json = resp.json()
+            results = resp_json.get("data", [])
+
+            for msg, result in zip(chunk, results):
+                token = msg.get("to")
+                if result.get("status") == "ok":
+                    sent_tokens.append(token)
+                else:
+                    failed.append(
+                        {
+                            "token": token,
+                            "error": result.get("message") or "Bilinmeyen hata",
+                            "details": result.get("details"),
+                        }
+                    )
+
+    return {"sent": sent_tokens, "failed": failed, "errors": errors}
 
 
 # Define Models
@@ -1486,8 +1618,13 @@ async def admin_login(request: AdminLoginRequest):
     return AdminLoginResponse(success=True, token=session_token)
 
 @admin_router.get("/users")
-async def get_all_users(session: dict = Depends(verify_admin_session)):
-    """Get all users from Supabase"""
+async def get_all_users(
+    page: int = 1,
+    page_size: int = 10,
+    q: Optional[str] = None,
+    session: dict = Depends(verify_admin_session),
+):
+    """Get paginated users from Supabase"""
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
@@ -1495,22 +1632,55 @@ async def get_all_users(session: dict = Depends(verify_admin_session)):
         from supabase import create_client, Client
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
-        # Get all profiles
-        rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/profiles?select=*"
+        page = max(page, 1)
+        page_size = max(min(page_size, 100), 1)
+        offset = (page - 1) * page_size
+
+        rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/profiles"
+
+        params = {
+            "select": "*",
+            "limit": page_size,
+            "offset": offset,
+            "order": "created_at.desc",
+        }
+
+        if q:
+            term = f"%{q}%"
+            params["or"] = f"email.ilike.{term},full_name.ilike.{term},id.ilike.{term}"
         
         async with httpx.AsyncClient(timeout=30.0) as http_client:
             resp = await http_client.get(
                 rest_url,
+                params=params,
                 headers={
                     "apikey": SUPABASE_KEY,
                     "Authorization": f"Bearer {SUPABASE_KEY}",
                     "Content-Type": "application/json",
+                    "Prefer": "count=exact",
                 },
             )
             
             if resp.status_code == 200:
                 users = resp.json()
-                return {"success": True, "users": users, "count": len(users)}
+                content_range = resp.headers.get("content-range", "")
+                total_count = None
+                if "/" in content_range:
+                    try:
+                        total_count = int(content_range.split("/")[-1])
+                    except ValueError:
+                        total_count = None
+                if total_count is None:
+                    total_count = len(users)
+
+                return {
+                    "success": True,
+                    "users": users,
+                    "count": len(users),
+                    "total": total_count,
+                    "page": page,
+                    "page_size": page_size,
+                }
             else:
                 raise HTTPException(status_code=500, detail=f"Failed to fetch users: {resp.text}")
                 
@@ -1700,7 +1870,7 @@ async def get_stats(session: dict = Depends(verify_admin_session)):
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
         
         # Get user stats
-        rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/profiles?select=id,subscription_tier,subscription_status,credits,created_at"
+        rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/profiles?select=id,subscription_tier,credits,created_at"
         
         async with httpx.AsyncClient(timeout=30.0) as http_client:
             resp = await http_client.get(
@@ -1717,7 +1887,8 @@ async def get_stats(session: dict = Depends(verify_admin_session)):
                 
                 # Calculate stats
                 total_users = len(users) if isinstance(users, list) else 0
-                active_users = len([u for u in users if isinstance(u, dict) and u.get("subscription_status") == "active"]) if isinstance(users, list) else 0
+                # subscription_status kolonu yok; aktif kullanıcıyı toplam olarak raporla
+                active_users = total_users
                 free_users = len([u for u in users if isinstance(u, dict) and u.get("subscription_tier") == "free"]) if isinstance(users, list) else 0
                 premium_users = len([u for u in users if isinstance(u, dict) and u.get("subscription_tier") == "premium"]) if isinstance(users, list) else 0
                 total_credits = sum(u.get("credits", 0) for u in users if isinstance(u, dict)) if isinstance(users, list) else 0
@@ -1775,29 +1946,37 @@ async def get_stats(session: dict = Depends(verify_admin_session)):
 @admin_router.post("/notifications/send")
 async def send_notification(request: NotificationRequest, session: dict = Depends(verify_admin_session)):
     """Send push notification to users"""
-    # Note: This is a placeholder. In production, you'd integrate with Expo Push Notification service
-    # or Firebase Cloud Messaging
-    
     try:
-        # For now, return success. In production, implement actual push notification sending
-        # You would need to:
-        # 1. Get user push tokens from database
-        # 2. Send notifications via Expo Push API or FCM
-        # 3. Handle errors and retries
-        
-        logger.info(f"Admin notification request from {session.get('email')}: title={request.title}, body={request.body}, user_id={request.user_id}")
-        
+        logger.info(
+            f"Admin notification request from {session.get('email')}: title={request.title}, body={request.body}, user_id={request.user_id}"
+        )
+
+        tokens = await fetch_push_tokens_from_supabase(request.user_id)
+
+        if not tokens:
+            raise HTTPException(status_code=404, detail="Gönderilecek push token bulunamadı")
+
+        result = await send_expo_push_notifications(tokens, request.title, request.body, request.data)
+
+        sent_count = len(result.get("sent", []))
+        failed = result.get("failed", [])
+        error_msgs = result.get("errors", [])
+
+        if failed or error_msgs:
+            logger.warning(
+                f"Push notification partial failures - sent: {sent_count}, failed: {len(failed)}, errors: {error_msgs}"
+            )
+
         return {
-            "success": True,
-            "message": "Notification queued (implementation needed)",
-            "notification": {
-                "title": request.title,
-                "body": request.body,
-                "user_id": request.user_id,
-                "data": request.data,
-            }
+            "success": len(failed) == 0,
+            "message": f"{sent_count} bildirim gönderildi, {len(failed)} başarısız",
+            "sent": sent_count,
+            "failed": failed,
+            "errors": error_msgs,
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Admin send notification error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

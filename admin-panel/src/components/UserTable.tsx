@@ -1,25 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { UserProfile } from '../types';
 
 type Props = {
   users: UserProfile[];
   onUpdateCredits: (userId: string, credits: number) => void;
   updating: boolean;
+  total: number;
+  page: number;
+  onSearchChange: (value: string) => void;
+  onPageChange: (page: number) => void;
 };
 
-export default function UserTable({ users, onUpdateCredits, updating }: Props) {
+export default function UserTable({
+  users,
+  total,
+  page,
+  onUpdateCredits,
+  updating,
+  onSearchChange,
+  onPageChange
+}: Props) {
   const [search, setSearch] = useState('');
   const [pendingCredits, setPendingCredits] = useState<Record<string, number>>({});
-
-  const filtered = useMemo(() => {
-    const term = search.toLowerCase();
-    return users.filter(
-      (u) =>
-        (u.email || '').toLowerCase().includes(term) ||
-        (u.full_name || '').toLowerCase().includes(term) ||
-        (u.id || '').toLowerCase().includes(term)
-    );
-  }, [users, search]);
 
   const handleChange = (userId: string, value: string) => {
     const numeric = Number(value);
@@ -34,12 +36,18 @@ export default function UserTable({ users, onUpdateCredits, updating }: Props) {
     onUpdateCredits(userId, next);
   };
 
+  const totalPages = Math.max(1, Math.ceil(total / 10));
+
   return (
     <div className="stack">
       <input
         placeholder="E-posta, isim veya ID ile ara"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onChange={(e) => {
+          const next = e.target.value;
+          setSearch(next);
+          onSearchChange(next);
+        }}
       />
 
       <div style={{ overflowX: 'auto' }}>
@@ -54,7 +62,7 @@ export default function UserTable({ users, onUpdateCredits, updating }: Props) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((user) => (
+            {users.map((user) => (
               <tr key={user.id}>
                 <td>
                   <div className="stack">
@@ -101,6 +109,24 @@ export default function UserTable({ users, onUpdateCredits, updating }: Props) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="muted">
+          Toplam {total} kullanıcı • Sayfa {page}/{totalPages}
+        </span>
+        <div className="table-actions">
+          <button className="btn secondary" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page <= 1}>
+            Önceki
+          </button>
+          <button
+            className="btn secondary"
+            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+            disabled={page >= totalPages}
+          >
+            Sonraki
+          </button>
+        </div>
       </div>
     </div>
   );
