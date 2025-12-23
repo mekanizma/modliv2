@@ -97,7 +97,6 @@ export async function setNotificationsEnabled(enabled: boolean) {
 }
 
 type EnsureOptions = {
-  debugImmediate?: boolean;
 };
 
 export async function ensureDailyOutfitReminderScheduled(
@@ -114,21 +113,12 @@ export async function ensureDailyOutfitReminderScheduled(
       return;
     }
 
-    const isDebug = options?.debugImmediate;
-    const storageKey = isDebug ? DAILY_OUTFIT_REMINDER_DEBUG_KEY : DAILY_OUTFIT_REMINDER_KEY;
-
-    // Test sürecinde tekrar tekrar görebilmek için debug modunda
-    // önce eski planlamaları temizleyelim.
-    if (isDebug) {
-      console.log('🔔 Debug mode: clearing previous reminders and scheduling test notification');
-      await cancelDailyOutfitReminders();
-    } else {
-      const existingId = await AsyncStorage.getItem(storageKey);
-      if (existingId) {
-        // Zaten planlanmış, tekrar oluşturma
-        console.log('🔔 Daily reminder already scheduled, skipping new schedule');
-        return;
-      }
+    const storageKey = DAILY_OUTFIT_REMINDER_KEY;
+    const existingId = await AsyncStorage.getItem(storageKey);
+    if (existingId) {
+      // Zaten planlanmış, tekrar oluşturma
+      console.log('🔔 Daily reminder already scheduled, skipping new schedule');
+      return;
     }
 
     const title =
@@ -141,49 +131,20 @@ export async function ensureDailyOutfitReminderScheduled(
         ? 'Bugünkü hava durumuna ve gardrobuna göre ne giyeceğini birlikte seçelim.'
         : "Let's pick what to wear today based on the weather and your wardrobe.";
 
-    if (isDebug) {
-      // iOS kısıtı sebebiyle (tekrarlı < 60 sn desteklenmiyor),
-      // önce ANINDA bir test bildirimi gönderiyoruz:
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: { type: 'daily_outfit_suggestion_debug_once' },
-        },
-        // trigger: null → hemen göster
-        trigger: null,
-      });
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        data: { type: 'daily_outfit_suggestion' },
+      },
+      trigger: {
+        hour: 7,
+        minute: 30,
+        repeats: true,
+      } as unknown as Notifications.DailyTriggerInput,
+    });
 
-      // Sonra da 60 sn'de bir tekrarlayan test bildirimi planlıyoruz
-      const debugId = await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: { type: 'daily_outfit_suggestion_debug_repeat' },
-        },
-        trigger: {
-          seconds: 60,
-          repeats: true,
-        } as Notifications.TimeIntervalTriggerInput,
-      });
-
-      await AsyncStorage.setItem(DAILY_OUTFIT_REMINDER_DEBUG_KEY, debugId);
-    } else {
-      const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title,
-          body,
-          data: { type: 'daily_outfit_suggestion' },
-        },
-        trigger: {
-          hour: 7,
-          minute: 30,
-          repeats: true,
-        } as unknown as Notifications.DailyTriggerInput,
-      });
-
-      await AsyncStorage.setItem(storageKey, id);
-    }
+    await AsyncStorage.setItem(storageKey, id);
   } catch (error) {
     console.warn('Failed to schedule daily outfit reminder', error);
   }
