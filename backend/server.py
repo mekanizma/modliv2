@@ -1646,8 +1646,12 @@ async def get_all_users(
         }
 
         if q:
-            term = f"%{q}%"
-            params["or"] = f"email.ilike.{term},full_name.ilike.{term},id.ilike.{term}"
+            term_raw = q.strip()
+            if term_raw:
+                safe_term = term_raw.replace(",", " ")
+                term = f"%{safe_term}%"
+                # PostgREST OR syntax: or=(col.ilike.term,col.ilike.term,...)
+                params["or"] = f"(email.ilike.{term},full_name.ilike.{term},id.ilike.{term})"
         
         async with httpx.AsyncClient(timeout=30.0) as http_client:
             resp = await http_client.get(
@@ -1682,7 +1686,9 @@ async def get_all_users(
                     "page_size": page_size,
                 }
             else:
-                raise HTTPException(status_code=500, detail=f"Failed to fetch users: {resp.text}")
+                error_detail = resp.text[:200] if resp.text else "Unknown error"
+                logger.error(f"Failed to fetch users: {resp.status_code} - {error_detail}")
+                raise HTTPException(status_code=500, detail=f"Failed to fetch users: {error_detail}")
                 
     except Exception as e:
         logger.error(f"Admin get users error: {str(e)}")
