@@ -25,6 +25,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 const imageSize = (width - 48) / 2;
@@ -63,6 +65,10 @@ export default function GalleryScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [bootstrappedFromTryOn, setBootstrappedFromTryOn] = useState(false);
+  const pinchScale = useSharedValue(1);
+  const pinchAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pinchScale.value }],
+  }));
   
   // Filtreleme state'leri
   const [filteredResults, setFilteredResults] = useState<TryOnResult[]>([]);
@@ -310,12 +316,12 @@ export default function GalleryScreen() {
     
     setActionLoading(true);
     try {
-      // Önce medya kütüphanesi iznini kontrol et ve iste
-      let perm = await MediaLibrary.getPermissionsAsync();
+      // Önce medya kütüphanesi iznini kontrol et ve iste (sadece görseller)
+      let perm = await MediaLibrary.getPermissionsAsync({ mediaTypes: MediaLibrary.MediaTypeOptions.Images });
       
       if (!perm.granted) {
         // İzin yoksa izin iste
-        perm = await MediaLibrary.requestPermissionsAsync();
+        perm = await MediaLibrary.requestPermissionsAsync({ mediaTypes: MediaLibrary.MediaTypeOptions.Images });
         
         if (!perm.granted) {
           // İzin reddedildiyse kullanıcıyı ayarlara yönlendir
@@ -658,24 +664,37 @@ export default function GalleryScreen() {
               <ScrollView
                 style={styles.scrollContainer}
                 contentContainerStyle={styles.scrollContentContainer}
-                maximumZoomScale={5}
-                minimumZoomScale={1}
                 showsHorizontalScrollIndicator={false}
                 showsVerticalScrollIndicator={false}
                 centerContent={true}
                 bouncesZoom={true}
                 scrollEventThrottle={16}
+                maximumZoomScale={1}
+                minimumZoomScale={1}
               >
-                <Image 
-                  source={{ uri: selectedImage.result_image_url }} 
-                  style={styles.fullImage} 
-                  contentFit="contain"
-                  onLoad={() => {
-                    setFullImageLoaded(true);
-                  }}
-                  transition={100}
-                  cachePolicy="memory-disk"
-                />
+                <GestureDetector
+                  gesture={Gesture.Pinch()
+                    .onUpdate((event) => {
+                      const next = Math.min(Math.max(event.scale, 1), 5);
+                      pinchScale.value = next;
+                    })
+                    .onEnd(() => {
+                      pinchScale.value = 1;
+                    })}
+                >
+                  <Animated.View style={[styles.fullImageWrapper, pinchAnimatedStyle]}>
+                    <Image 
+                      source={{ uri: selectedImage.result_image_url }} 
+                      style={styles.fullImage} 
+                      contentFit="contain"
+                      onLoad={() => {
+                        setFullImageLoaded(true);
+                      }}
+                      transition={100}
+                      cachePolicy="memory-disk"
+                    />
+                  </Animated.View>
+                </GestureDetector>
               </ScrollView>
             </View>
           )}
@@ -763,6 +782,7 @@ const styles = StyleSheet.create({
   imageWrapper: { flex: 1, width: width, justifyContent: 'center', alignItems: 'center', position: 'relative' },
   scrollContainer: { flex: 1, width: width },
   scrollContentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  fullImageWrapper: { alignItems: 'center', justifyContent: 'center' },
   fullImage: { 
     width: width, 
     height: height * 0.7,
