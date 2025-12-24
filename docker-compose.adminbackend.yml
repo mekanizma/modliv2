@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Admin Backend API (admin panel için)
+  adminbackend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: modli-admin-backend
+    ports:
+      # Ana backend 3000:8000 kullanıyor; admin backend için farklı bir dış port veriyoruz
+      - "3001:8000"
+    environment:
+      # Coolify tarafında bu değişkenleri kendi ortamına göre override edebilirsin
+      MONGO_URL: ${MONGO_URL:-mongodb://localhost:27017}
+      DB_NAME: ${DB_NAME:-modli_prod}
+
+      # AI ve hava durumu servisleri
+      FAL_KEY: ${FAL_KEY}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+
+      # Supabase ayarları (admin router bunları yoğun kullanıyor)
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_KEY: ${SUPABASE_KEY}
+
+      # Admin panel giriş bilgileri (Coolify'da secret olarak ayarlaman önerilir)
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-modli@mekanizma.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-12345678}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-modli-admin-secret-token-change-in-production}
+
+      PYTHONUNBUFFERED: "1"
+
+    # Bu compose dosyasında MongoDB servisi tanımlamıyoruz;
+    # Coolify'da harici MongoDB kaynağına / connection string'e bağlanman bekleniyor.
+    restart: unless-stopped
+
+

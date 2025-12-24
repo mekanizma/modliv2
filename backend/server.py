@@ -370,13 +370,27 @@ async def oauth_callback(
           const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
           console.log('Redirecting to:', deepLink);
           
-          // Önce deep link'i dene
-          window.location.href = deepLink;
-          
-          // Fallback: Eğer deep link çalışmazsa 2 saniye sonra tekrar dene
-          setTimeout(() => {{
+          // Android için daha güvenilir yöntem: window.location.replace kullan
+          // Ayrıca intent:// fallback ekle (Android için)
+          try {{
+            // Önce modli:// deep link'i dene
+            window.location.replace(deepLink);
+            
+            // Android fallback: intent:// kullan
+            setTimeout(() => {{
+              const intentLink = `intent://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth#Intent;scheme=modli;package=com.mekanizma.modli;end`;
+              window.location.replace(intentLink);
+            }}, 500);
+            
+            // Son fallback: window.location.href
+            setTimeout(() => {{
+              window.location.href = deepLink;
+            }}, 1000);
+          }} catch (e) {{
+            console.error('Deep link redirect error:', e);
+            // Son çare: window.location.href
             window.location.href = deepLink;
-          }}, 2000);
+          }}
         }} else {{
           console.error('No tokens found in callback');
           document.body.innerHTML = '<div class="container"><p style="color: #f97373;">Hata: Token\'lar bulunamadı.</p></div>';
@@ -1635,12 +1649,13 @@ async def get_all_users(
         page = max(page, 1)
         page_size = max(min(page_size, 100), 1)
         offset = (page - 1) * page_size
-        range_end = offset + page_size - 1
 
         rest_url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/profiles"
 
         params = {
             "select": "*",
+            "limit": page_size,
+            "offset": offset,
             "order": "created_at.desc",
         }
 
@@ -1657,7 +1672,6 @@ async def get_all_users(
                     "Authorization": f"Bearer {SUPABASE_KEY}",
                     "Content-Type": "application/json",
                     "Prefer": "count=exact",
-                    "Range": f"{offset}-{range_end}",
                 },
             )
             

@@ -259,19 +259,41 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const fetchWeather = async () => {
+  const fetchWeather = async (retryCount = 0) => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      // Konum servislerinin açık olup olmadığını kontrol et
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        console.warn('Location services are disabled');
         setWeatherLoading(false);
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('Location permission not granted:', status);
+        setWeatherLoading(false);
+        return;
+      }
+
+      // Android için accuracy ve timeout belirt
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeout: 15000, // 15 saniye timeout
+        maximumAge: 60000, // 1 dakika cache
+      });
+      
       const { latitude, longitude } = location.coords;
 
+      if (!OPENWEATHER_API_KEY) {
+        console.error('OpenWeather API key not configured');
+        setWeatherLoading(false);
+        return;
+      }
+
       const response = await axios.get(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=${language}`
+        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=${language}`,
+        { timeout: 10000 }
       );
 
       const data = response.data;
@@ -283,8 +305,20 @@ export default function HomeScreen() {
         isCold: data.main.temp < 15,
         isRainy: data.weather[0].main.toLowerCase().includes('rain'),
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching weather:', error);
+      
+      // Retry mekanizması - maksimum 2 deneme
+      if (retryCount < 2 && (error.code === 'TIMEOUT' || error.message?.includes('timeout'))) {
+        console.log(`Retrying weather fetch (attempt ${retryCount + 1})...`);
+        setTimeout(() => {
+          fetchWeather(retryCount + 1);
+        }, 2000);
+        return;
+      }
+      
+      // Hata durumunda weather state'ini null yap
+      setWeather(null);
     } finally {
       setWeatherLoading(false);
     }

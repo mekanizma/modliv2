@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useLanguage } from '../src/contexts/LanguageContext';
@@ -13,6 +14,19 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SUBSCRIPTION_PLANS, SubscriptionPlan } from '../src/types';
+import {
+  initPurchases,
+  setupPurchaseListeners,
+  cleanupPurchaseListeners,
+  purchaseProduct,
+  acknowledgePurchase,
+  getProducts,
+  getProductIdFromPlanId,
+  endConnection,
+  Purchase,
+  PurchaseError,
+  Product,
+} from '../src/lib/purchases';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
@@ -22,6 +36,116 @@ export default function SubscriptionScreen() {
   
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
   const [purchasing, setPurchasing] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [iapInitialized, setIapInitialized] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+
+  // In-app purchase servisini başlat
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeIAP = async () => {
+      try {
+        const initialized = await initPurchases();
+        if (!initialized || !mounted) return;
+
+        setIapInitialized(true);
+
+        // Satın alma listener'larını kur
+        setupPurchaseListeners(
+          async (purchase: Purchase) => {
+            console.log('Purchase completed:', purchase);
+            
+            // Satın alınan planı bul
+            const purchasedPlan = SUBSCRIPTION_PLANS.find(
+              plan => plan.productId === purchase.productId
+            );
+
+            if (purchasedPlan) {
+              // Satın almayı doğrula ve tamamla
+              const acknowledged = await acknowledgePurchase(purchase);
+              
+              if (acknowledged) {
+                // Kredileri ekle
+                await updateProfile({
+                  credits: (profile?.credits || 0) + purchasedPlan.credits,
+                  subscription_tier: purchasedPlan.id,
+                });
+                await refreshProfile();
+                
+                setPurchasing(false);
+                
+                Alert.alert(
+                  language === 'en' ? 'Success!' : 'Başarılı!',
+                  language === 'en'
+                    ? `${purchasedPlan.credits} credits added to your account`
+                    : `${purchasedPlan.credits} kredi hesabınıza eklendi`,
+                  [{ text: 'OK', onPress: () => router.back() }]
+                );
+              } else {
+                setPurchasing(false);
+                Alert.alert(
+                  language === 'en' ? 'Error' : 'Hata',
+                  language === 'en'
+                    ? 'Failed to verify purchase. Please contact support.'
+                    : 'Satın alma doğrulanamadı. Lütfen destek ile iletişime geçin.',
+                  [{ text: 'OK' }]
+                );
+              }
+            } else {
+              setPurchasing(false);
+              Alert.alert(
+                language === 'en' ? 'Error' : 'Hata',
+                language === 'en'
+                  ? 'Unknown product purchased.'
+                  : 'Bilinmeyen ürün satın alındı.',
+                [{ text: 'OK' }]
+              );
+            }
+          },
+          (error: PurchaseError) => {
+            console.error('Purchase error:', error);
+            setPurchasing(false);
+            
+            if (error.code !== 'E_USER_CANCELLED' && error.code !== 'USER_CANCELLED') {
+              Alert.alert(
+                language === 'en' ? 'Purchase Failed' : 'Satın Alma Başarısız',
+                error.message || (language === 'en' ? 'An error occurred during purchase.' : 'Satın alma sırasında bir hata oluştu.'),
+                [{ text: 'OK' }]
+              );
+            }
+          }
+        );
+
+        // Ürünleri yükle
+        const availableProducts = await getProducts();
+        if (mounted) {
+          setProducts(availableProducts);
+          setLoadingProducts(false);
+        }
+      } catch (error) {
+        console.error('Failed to initialize IAP:', error);
+        if (mounted) {
+          setLoadingProducts(false);
+          Alert.alert(
+            language === 'en' ? 'Error' : 'Hata',
+            language === 'en'
+              ? 'Failed to initialize purchase service. Please try again later.'
+              : 'Satın alma servisi başlatılamadı. Lütfen daha sonra tekrar deneyin.',
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    };
+
+    initializeIAP();
+
+    return () => {
+      mounted = false;
+      cleanupPurchaseListeners();
+      endConnection();
+    };
+  }, []);
 
   const getPlanTagline = (planId: string) => {
     if (language === 'en') {
@@ -52,38 +176,60 @@ export default function SubscriptionScreen() {
   const handlePurchase = async () => {
     if (!selectedPlan) return;
 
+    // IAP servisi başlatılmadıysa uyar
+    if (!iapInitialized) {
+      Alert.alert(
+        language === 'en' ? 'Error' : 'Hata',
+        language === 'en'
+          ? 'Purchase service is not ready. Please wait a moment and try again.'
+          : 'Satın alma servisi hazır değil. Lütfen birkaç saniye bekleyip tekrar deneyin.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setPurchasing(true);
-    
-    // In production, integrate with payment provider (Stripe, RevenueCat, etc.)
-    // For now, simulate a purchase
-    Alert.alert(
-      language === 'en' ? 'Payment' : 'Ödeme',
-      language === 'en'
-        ? `This would charge $${selectedPlan.price_usd} for ${selectedPlan.credits} credits`
-        : `${selectedPlan.credits} kredi için ${selectedPlan.price_try} TL tahsil edilecektir`,
-      [
-        { text: t.common.cancel, style: 'cancel', onPress: () => setPurchasing(false) },
-        {
-          text: language === 'en' ? 'Confirm (Demo)' : 'Onayla (Demo)',
-          onPress: async () => {
-            // Demo: Add credits
-            await updateProfile({
-              credits: (profile?.credits || 0) + selectedPlan.credits,
-              subscription_tier: selectedPlan.id,
-            });
-            await refreshProfile();
-            setPurchasing(false);
-            Alert.alert(
-              language === 'en' ? 'Success!' : 'Başarılı!',
-              language === 'en'
-                ? `${selectedPlan.credits} credits added to your account`
-                : `${selectedPlan.credits} kredi hesabınıza eklendi`,
-              [{ text: 'OK', onPress: () => router.back() }]
-            );
-          },
-        },
-      ]
-    );
+
+    try {
+      const productId = selectedPlan.productId;
+      
+      // Ürünün mevcut olup olmadığını kontrol et
+      const product = products.find(p => p.productId === productId);
+      if (!product) {
+        setPurchasing(false);
+        Alert.alert(
+          language === 'en' ? 'Error' : 'Hata',
+          language === 'en'
+            ? 'Product not available. Please try again later.'
+            : 'Ürün mevcut değil. Lütfen daha sonra tekrar deneyin.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Satın alma işlemini başlat
+      const result = await purchaseProduct(productId);
+      
+      if (!result.success) {
+        if (result.error !== 'cancelled') {
+          Alert.alert(
+            language === 'en' ? 'Purchase Failed' : 'Satın Alma Başarısız',
+            result.error || (language === 'en' ? 'An error occurred during purchase.' : 'Satın alma sırasında bir hata oluştu.'),
+            [{ text: 'OK' }]
+          );
+        }
+        setPurchasing(false);
+      }
+      // Başarılı satın alma listener üzerinden işlenecek
+    } catch (error: any) {
+      console.error('Purchase error:', error);
+      setPurchasing(false);
+      Alert.alert(
+        language === 'en' ? 'Purchase Failed' : 'Satın Alma Başarısız',
+        error.message || (language === 'en' ? 'An error occurred during purchase.' : 'Satın alma sırasında bir hata oluştu.'),
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const getPlanColor = (planId: string) => {
@@ -132,6 +278,27 @@ export default function SubscriptionScreen() {
           </Text>
         </View>
 
+        {/* Loading Products */}
+        {loadingProducts && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>
+              {language === 'en' ? 'Loading products...' : 'Ürünler yükleniyor...'}
+            </Text>
+          </View>
+        )}
+
+        {/* IAP Not Available Warning */}
+        {!loadingProducts && !iapInitialized && (
+          <View style={styles.warningContainer}>
+            <Ionicons name="warning" size={20} color="#f59e0b" />
+            <Text style={styles.warningText}>
+              {language === 'en'
+                ? 'Purchase service is not available. Please check your internet connection.'
+                : 'Satın alma servisi mevcut değil. Lütfen internet bağlantınızı kontrol edin.'}
+            </Text>
+          </View>
+        )}
+
         {/* Plans */}
         {SUBSCRIPTION_PLANS.map((plan) => (
           <TouchableOpacity
@@ -169,9 +336,15 @@ export default function SubscriptionScreen() {
               </View>
               <View style={styles.planPrice}>
                 <Text style={styles.priceMain}>
-                  {language === 'en'
-                    ? `$${plan.price_usd}`
-                    : `${plan.price_try} TL`}
+                  {(() => {
+                    const product = products.find(p => p.productId === plan.productId);
+                    if (product && product.localizedPrice) {
+                      return product.localizedPrice;
+                    }
+                    return language === 'en'
+                      ? `$${plan.price_usd}`
+                      : `${plan.price_try} TL`;
+                  })()}
                 </Text>
               </View>
             </View>
@@ -432,5 +605,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginTop: 12,
+  },
+  loadingContainer: {
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  loadingText: {
+    color: '#9ca3af',
+    fontSize: 14,
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    gap: 10,
+  },
+  warningText: {
+    color: '#f59e0b',
+    fontSize: 14,
+    flex: 1,
   },
 });

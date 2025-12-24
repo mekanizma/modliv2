@@ -25,8 +25,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import ZoomableImage from '../../src/components/ZoomableImage';
 
 const { width, height } = Dimensions.get('window');
 const imageSize = (width - 48) / 2;
@@ -65,10 +65,6 @@ export default function GalleryScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [bootstrappedFromTryOn, setBootstrappedFromTryOn] = useState(false);
-  const pinchScale = useSharedValue(1);
-  const pinchAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pinchScale.value }],
-  }));
   
   // Filtreleme state'leri
   const [filteredResults, setFilteredResults] = useState<TryOnResult[]>([]);
@@ -200,8 +196,12 @@ export default function GalleryScreen() {
     if (user) {
       setPage(0);
       setHasMore(true);
+      setLoading(true);
       setInitialLoad(true);
       fetchResults(0, true);
+    } else {
+      setLoading(false);
+      setInitialLoad(false);
     }
   }, [user, fetchResults]);
 
@@ -234,14 +234,18 @@ export default function GalleryScreen() {
 
       // Load from cache first for instant display
       loadFromCache();
-      // Then fetch fresh data
-      if (user) {
+      
+      // Sadece user varsa ve results boşsa veya refresh gerekiyorsa fetch yap
+      if (user && (results.length === 0 || initialLoad)) {
         setPage(0);
         setHasMore(true);
-        setInitialLoad(true);
+        setLoading(true);
         fetchResults(0, true);
+      } else if (!user) {
+        setLoading(false);
+        setInitialLoad(false);
       }
-    }, [user, params.fromTryOn, params.resultUrl, params.wardrobeItemId, bootstrappedFromTryOn, fetchResults])
+    }, [user, params.fromTryOn, params.resultUrl, params.wardrobeItemId, bootstrappedFromTryOn, initialLoad, results.length, fetchResults])
   );
 
   // Filtreleme fonksiyonu
@@ -316,41 +320,6 @@ export default function GalleryScreen() {
     
     setActionLoading(true);
     try {
-      // Önce medya kütüphanesi iznini kontrol et ve iste (sadece görseller, destek yoksa fallback)
-      const mediaTypes = (MediaLibrary as any)?.MediaTypeOptions?.Images;
-      let perm = mediaTypes
-        ? await MediaLibrary.getPermissionsAsync({ mediaTypes })
-        : await MediaLibrary.getPermissionsAsync();
-      
-      if (!perm.granted) {
-        // İzin yoksa izin iste
-        perm = mediaTypes
-          ? await MediaLibrary.requestPermissionsAsync({ mediaTypes })
-          : await MediaLibrary.requestPermissionsAsync();
-        
-        if (!perm.granted) {
-          // İzin reddedildiyse kullanıcıyı ayarlara yönlendir
-          Alert.alert(
-            language === 'en' ? 'Permission needed' : 'İzin gerekli',
-            language === 'en'
-              ? 'Please allow photo library permission to save images in your device settings.'
-              : 'Görselleri kaydetmek için cihaz ayarlarından fotoğraf galerisi izni vermeniz gerekiyor.',
-            [
-              {
-                text: language === 'en' ? 'Cancel' : 'İptal',
-                style: 'cancel',
-              },
-              {
-                text: language === 'en' ? 'Open Settings' : 'Ayarları Aç',
-                onPress: () => Linking.openSettings(),
-              },
-            ]
-          );
-          setActionLoading(false);
-          return;
-        }
-      }
-
       const filename = `modli_${Date.now()}.jpg`;
       const fileUri = `${FileSystem.cacheDirectory}${filename}`;
 
@@ -370,11 +339,16 @@ export default function GalleryScreen() {
       );
     } catch (error: any) {
       console.error('Download error:', error);
+      const msg = error?.message || '';
+      const permissionHint =
+        language === 'en'
+          ? 'Please enable photo/media permission in Settings and try again.'
+          : 'Lütfen Ayarlar’dan fotoğraf/medya iznini açıp tekrar deneyin.';
       Alert.alert(
         language === 'en' ? 'Error' : 'Hata', 
         language === 'en' 
-          ? `Failed to save: ${error?.message || 'Unknown error'}` 
-          : `Kaydetme başarısız: ${error?.message || 'Bilinmeyen hata'}`
+          ? `Failed to save: ${msg || 'Unknown error'}\n${permissionHint}`
+          : `Kaydetme başarısız: ${msg || 'Bilinmeyen hata'}\n${permissionHint}`
       );
     } finally {
       setActionLoading(false);
@@ -584,7 +558,7 @@ export default function GalleryScreen() {
             {filteredResults.length}/{results.length} {language === 'en' ? 'images' : 'görsel'}
           </Text>
         </View>
-        {initialLoad && (
+        {loading && (
           <ActivityIndicator size="small" color="#6366f1" />
         )}
       </View>
@@ -647,7 +621,7 @@ export default function GalleryScreen() {
         columnWrapperStyle={styles.row}
         contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + 100 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6366f1" />}
-        ListEmptyComponent={initialLoad ? null : renderEmpty}
+        ListEmptyComponent={!loading && filteredResults.length === 0 ? renderEmpty : null}
         ListFooterComponent={renderFooter}
         onEndReached={loadMore}
         onEndReachedThreshold={0.3}
@@ -659,50 +633,29 @@ export default function GalleryScreen() {
       />
 
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={closeModal}>
-        <View style={styles.modalContainer}>
-          <TouchableOpacity style={[styles.modalCloseButton, { top: insets.top + 10 }]} onPress={closeModal}>
-            <Ionicons name="close" size={28} color="#fff" />
-          </TouchableOpacity>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View style={styles.modalContainer}>
+            <TouchableOpacity style={[styles.modalCloseButton, { top: insets.top + 10 }]} onPress={closeModal}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
 
-          {selectedImage && (
-            <View style={styles.imageWrapper}>
-              <ScrollView
-                style={styles.scrollContainer}
-                contentContainerStyle={styles.scrollContentContainer}
-                showsHorizontalScrollIndicator={false}
-                showsVerticalScrollIndicator={false}
-                centerContent={true}
-                bouncesZoom={true}
-                scrollEventThrottle={16}
-                maximumZoomScale={1}
-                minimumZoomScale={1}
-              >
-                <GestureDetector
-                  gesture={Gesture.Pinch()
-                    .onUpdate((event) => {
-                      const next = Math.min(Math.max(event.scale, 1), 5);
-                      pinchScale.value = next;
-                    })
-                    .onEnd(() => {
-                      pinchScale.value = 1;
-                    })}
-                >
-                  <Animated.View style={[styles.fullImageWrapper, pinchAnimatedStyle]}>
-                    <Image 
-                      source={{ uri: selectedImage.result_image_url }} 
-                      style={styles.fullImage} 
-                      contentFit="contain"
-                      onLoad={() => {
-                        setFullImageLoaded(true);
-                      }}
-                      transition={100}
-                      cachePolicy="memory-disk"
-                    />
-                  </Animated.View>
-                </GestureDetector>
-              </ScrollView>
-            </View>
-          )}
+            {selectedImage && (
+              <View style={styles.imageWrapper}>
+                <ZoomableImage
+                  uri={selectedImage.result_image_url}
+                  minScale={1}
+                  maxScale={5}
+                  doubleTapScale={2.5}
+                  onZoomActiveChange={() => {
+                    // Şu an için parent swipe gesture yok, ileride
+                    // swipe-to-close / swipe-between-images eklenirse
+                    // bu callback ile enable/disable kontrol edilebilir.
+                  }}
+                  containerStyle={styles.zoomableContainer}
+                  imageWrapperStyle={styles.fullImage}
+                />
+              </View>
+            )}
 
           <View style={[styles.modalActions, { paddingBottom: insets.bottom + 20 }]}>
             {actionLoading ? (
@@ -733,7 +686,8 @@ export default function GalleryScreen() {
               </>
             )}
           </View>
-        </View>
+          </View>
+        </GestureHandlerRootView>
       </Modal>
     </View>
   );
@@ -791,6 +745,12 @@ const styles = StyleSheet.create({
   fullImage: { 
     width: width, 
     height: height * 0.7,
+  },
+  zoomableContainer: {
+    width,
+    height: height * 0.7,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalActions: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 20, paddingTop: 20, backgroundColor: 'rgba(0,0,0,0.8)' },
   modalButton: { alignItems: 'center', gap: 4 },

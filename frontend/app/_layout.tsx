@@ -76,41 +76,75 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
     // Deep link listener - OAuth callback'i yakala
     const handleDeepLink = async (event: { url: string }) => {
       console.log('🔗 Deep link received:', event.url);
+      console.log('🔗 Full URL:', JSON.stringify(event.url));
+      
+      // Expo dev URL'lerini yok say (exp://...)
+      if (event.url.startsWith('exp://') || event.url.startsWith('exps://')) {
+        console.log('🔗 Expo dev URL detected, ignoring:', event.url);
+        return;
+      }
       
       try {
-        let url: URL;
-        try {
-          url = new URL(event.url);
-        } catch {
-          // Deep link formatı (modli://...)
-          const match = event.url.match(/modli:\/\/(.*)/);
-          if (match) {
-            const pathAndQuery = match[1];
-            // Hash varsa query string'e çevir
-            const [path, hash] = pathAndQuery.split('#');
-            if (hash) {
-              url = new URL(`https://modli.mekanizma.com/${path}?${hash}`);
-            } else {
-              url = new URL(`https://modli.mekanizma.com/${pathAndQuery}`);
-            }
+        let accessToken: string | null = null;
+        let refreshToken: string | null = null;
+        let type: string | null = null;
+        
+        // Deep link formatını parse et (modli://auth/callback?access_token=...&refresh_token=...)
+        if (event.url.includes('modli://')) {
+          console.log('🔗 Detected modli:// deep link');
+          
+          // modli://auth/callback?access_token=...&refresh_token=... formatı
+          const urlMatch = event.url.match(/modli:\/\/[^?]+\?(.*)/);
+          if (urlMatch) {
+            console.log('🔗 Found query string:', urlMatch[1]);
+            const params = new URLSearchParams(urlMatch[1]);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+            type = params.get('type');
+            console.log('🔗 Parsed tokens - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
           } else {
-            console.error('❌ Invalid URL format:', event.url);
-            return;
+            // modli://auth/callback#access_token=...&refresh_token=... formatı (hash)
+            const hashMatch = event.url.match(/modli:\/\/[^#]+#(.*)/);
+            if (hashMatch) {
+              console.log('🔗 Found hash:', hashMatch[1]);
+              const params = new URLSearchParams(hashMatch[1]);
+              accessToken = params.get('access_token');
+              refreshToken = params.get('refresh_token');
+              type = params.get('type');
+              console.log('🔗 Parsed tokens from hash - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
+            } else {
+              console.warn('⚠️ No query string or hash found in modli:// URL');
+            }
           }
+        } else if (event.url.includes('auth/callback')) {
+          // HTTPS URL formatı (https://modli.mekanizma.com/auth/callback?...)
+          console.log('🔗 Detected HTTPS callback URL');
+          try {
+            const url = new URL(event.url);
+            const hash = url.hash.substring(1);
+            const params = new URLSearchParams(hash || url.search);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+            type = params.get('type');
+            console.log('🔗 Parsed tokens from HTTPS - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
+          } catch (parseError) {
+            console.error('❌ URL parse error:', parseError);
+            // Alternatif: regex ile parse et
+            const accessTokenMatch = event.url.match(/access_token=([^&]*)/);
+            const refreshTokenMatch = event.url.match(/refresh_token=([^&]*)/);
+            accessToken = accessTokenMatch ? decodeURIComponent(accessTokenMatch[1]) : null;
+            refreshToken = refreshTokenMatch ? decodeURIComponent(refreshTokenMatch[1]) : null;
+            console.log('🔗 Parsed tokens from regex - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
+          }
+        } else {
+          console.warn('⚠️ URL does not contain modli:// or auth/callback:', event.url);
         }
-        
-        const hash = url.hash.substring(1);
-        const params = new URLSearchParams(hash || url.search);
-        
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        const type = params.get('type');
         
         // OAuth callback kontrolü
         if (accessToken && refreshToken) {
           console.log('🔐 OAuth callback detected, setting session...');
           
-          const { error: sessionError } = await supabase.auth.setSession({
+          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
@@ -119,27 +153,33 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
             console.error('❌ Session set error:', sessionError);
           } else {
             console.log('✅ Session set successfully');
-            // Profile'i yükle
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-              // AuthContext'teki fetchProfile otomatik çağrılacak
-              // onAuthStateChange event'i tetiklenecek
-            }
+            console.log('✅ User ID:', sessionData.session?.user?.id);
+            // onAuthStateChange event'i otomatik tetiklenecek ve AuthContext güncellenecek
+            // Bu sayede loading state'i de otomatik olarak false olacak
           }
         } else if (type === 'recovery') {
           // Password recovery callback
           console.log('🔐 Password recovery callback detected');
+        } else {
+          console.warn('⚠️ Deep link received but no tokens found');
+          console.warn('⚠️ URL:', event.url);
+          console.warn('⚠️ accessToken:', accessToken);
+          console.warn('⚠️ refreshToken:', refreshToken);
         }
       } catch (error) {
         console.error('❌ Deep link parse error:', error);
+        console.error('❌ Error details:', JSON.stringify(error));
       }
     };
 
     // İlk açılışta URL'i kontrol et
     Linking.getInitialURL().then((url) => {
       if (url) {
+        console.log('🔗 Initial URL:', url);
         handleDeepLink({ url });
       }
+    }).catch((error) => {
+      console.error('❌ Error getting initial URL:', error);
     });
 
     // Deep link listener'ı ekle

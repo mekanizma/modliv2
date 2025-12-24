@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { registerPushToken, requestNotificationPermission } from '../lib/notifications';
@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [pushRegistered, setPushRegistered] = useState(false);
+  const oauthInProgressRef = useRef(false);
 
   useEffect(() => {
     // Timeout mekanizması - 10 saniye sonra loading'i false yap (session yüklenmesi için daha fazla zaman)
@@ -132,7 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
+          // OAuth callback'ten sonra session set edildiğinde oauthInProgress'i false yap
+          if (oauthInProgressRef.current) {
+            console.log('✅ OAuth callback completed, session set');
+            oauthInProgressRef.current = false;
+          }
           await fetchProfile(session.user.id);
+          await requestNotificationPermission();
         } else {
           setProfile(null);
           setLoading(false);
@@ -314,6 +321,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
     setLoading(true);
+    oauthInProgressRef.current = true;
+    
+    // Deep link callback için timeout - 60 saniye sonra loading'i false yap (Android'de daha uzun sürebilir)
+    const oauthTimeout = setTimeout(() => {
+      if (oauthInProgressRef.current) {
+        console.warn('⏰ OAuth timeout after 60 seconds');
+        oauthInProgressRef.current = false;
+        setLoading(false);
+      }
+    }, 60000);
+    
     try {
       // Tüm platformlarda tek tip HTTPS callback kullan
       // Backend /auth/callback token'ları alıp modli://auth/callback ile app'e geri yönlendiriyor
@@ -331,6 +349,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('❌ OAuth error:', error);
+        clearTimeout(oauthTimeout);
+        oauthInProgressRef.current = false;
         setLoading(false);
         return { error };
       }
@@ -377,6 +397,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (sessionError) {
+              clearTimeout(oauthTimeout);
+              oauthInProgressRef.current = false;
               setLoading(false);
               return { error: sessionError };
             }
@@ -386,33 +408,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               await fetchProfile(sessionData.session.user.id);
               await requestNotificationPermission();
             }
+            clearTimeout(oauthTimeout);
+            oauthInProgressRef.current = false;
             setLoading(false);
             return { error: null };
           } else {
+            clearTimeout(oauthTimeout);
+            oauthInProgressRef.current = false;
             setLoading(false);
             return { error: { message: 'Token\'lar alınamadı. Lütfen tekrar deneyin.' } };
           }
         } else if (result.type === 'cancel') {
+          clearTimeout(oauthTimeout);
+          oauthInProgressRef.current = false;
           setLoading(false);
           return { error: { message: 'OAuth işlemi iptal edildi.' } };
         } else {
           // Callback endpoint modli:// deep link ile dönecek; deep link listener yakalayacak
+          // Loading state'i deep link callback geldiğinde onAuthStateChange ile false olacak
+          console.log('📱 OAuth result type:', result.type);
           console.log('📱 OAuth: waiting for deep link callback...');
-          setLoading(false);
+          console.log('📱 Deep link should be: modli://auth/callback?access_token=...&refresh_token=...');
+          // Timeout'u temizleme - deep link callback bekleniyor
+          // Deep link handler _layout.tsx'te çalışacak
           return { error: null };
         }
       }
 
+      clearTimeout(oauthTimeout);
+      oauthInProgressRef.current = false;
       setLoading(false);
       return { error: null };
     } catch (err: any) {
       console.error('❌ OAuth sign in error:', err);
+      clearTimeout(oauthTimeout);
+      oauthInProgressRef.current = false;
       setLoading(false);
       return { 
         error: { 
           message: err.message || 'OAuth girişi sırasında bir hata oluştu.',
           code: 'OAUTH_ERROR'
-        } 
+        }
       };
     }
   };

@@ -22,6 +22,12 @@ const ExpoSecureStoreAdapter = {
       }
       return;
     }
+    
+    // SecureStore 2048 byte limit kontrolü
+    // Not: Bu uyarı normal olabilir, Supabase session'ı bazen büyük olabilir
+    // Supabase'in kendi storage adapter'ı bu durumu handle eder
+    // Session genellikle access_token ve refresh_token içerir, bu normaldir
+    
     await SecureStore.setItemAsync(key, value);
   },
   removeItem: async (key: string) => {

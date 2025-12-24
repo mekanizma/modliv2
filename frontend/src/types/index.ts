@@ -48,6 +48,7 @@ export interface SubscriptionPlan {
   credits: number;
   price_try: number;
   price_usd: number;
+  productId: string; // Google Play / App Store product ID
 }
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -57,6 +58,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     credits: 15,
     price_try: 149,
     price_usd: 3.99,
+    productId: 'com.mekanizma.modli.basic',
   },
   {
     id: 'standard',
@@ -64,6 +66,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     credits: 30,
     price_try: 199,
     price_usd: 4.99,
+    productId: 'com.mekanizma.modli.standard',
   },
   {
     id: 'premium',
@@ -71,8 +74,12 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     credits: 90,
     price_try: 499,
     price_usd: 11.99,
+    productId: 'com.mekanizma.modli.premium',
   },
 ];
+
+// Google Play / App Store product IDs
+export const PRODUCT_IDS = SUBSCRIPTION_PLANS.map(plan => plan.productId);
 
 export const CLOTHING_COLORS = [
   { name: 'Black', value: '#000000' },
