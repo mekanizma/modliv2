@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ClothingCategory, Season, CLOTHING_COLORS } from '../src/types';
 import axios from 'axios';
 import { uploadImageToStorage } from '../src/lib/storage';
+import { supabase } from '../src/lib/supabase';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -133,6 +134,13 @@ export default function AddItemScreen() {
       const { fullUrl, thumbnailUrl } = uploadResponse;
       console.log('✅ Image uploaded:', { fullUrl, thumbnailUrl });
 
+      // Get Supabase session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error(language === 'en' ? 'Please login first' : 'Lütfen önce giriş yapın');
+      }
+
       // Save to database via backend (service role kullanarak)
       await axios.post(`${BACKEND_URL}/api/wardrobe-items`, {
         user_id: user.id,
@@ -142,6 +150,10 @@ export default function AddItemScreen() {
         category,
         season: season || null,
         color: color || null,
+      }, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
 
       console.log('✅ Item saved to database');

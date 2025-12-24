@@ -218,6 +218,18 @@ export default function TryOnScreen() {
     setResultImage(null);
 
     try {
+      // Get Supabase session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        Alert.alert(
+          language === 'en' ? 'Authentication Required' : 'Kimlik Doğrulama Gerekli',
+          language === 'en' ? 'Please login first' : 'Lütfen önce giriş yapın'
+        );
+        setGenerating(false);
+        return;
+      }
+
       // Check if this is a free trial (credits === 1 means first free try)
       const isFreeTrial = (profile.credits || 0) === 1;
       
@@ -233,6 +245,9 @@ export default function TryOnScreen() {
           is_free_trial: isFreeTrial,
         },
         {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          },
           timeout: 300000, // 5 dakika timeout (backend ile uyumlu)
         }
       );
@@ -247,11 +262,18 @@ export default function TryOnScreen() {
 
         // Save result directly to gallery in the background
         try {
-          await axios.post(`${BACKEND_URL}/api/tryon-results`, {
-            user_id: user.id,
-            wardrobe_item_id: selectedItem.id,
-            result_image_url: resultUrl,
-          });
+          const { data: { session: saveSession } } = await supabase.auth.getSession();
+          if (saveSession) {
+            await axios.post(`${BACKEND_URL}/api/tryon-results`, {
+              user_id: user.id,
+              wardrobe_item_id: selectedItem.id,
+              result_image_url: resultUrl,
+            }, {
+              headers: {
+                'Authorization': `Bearer ${saveSession.access_token}`
+              }
+            });
+          }
         } catch (saveError) {
           console.error('Error auto-saving result to gallery:', saveError);
         }

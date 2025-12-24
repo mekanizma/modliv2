@@ -37,3 +37,4 @@ npm run preview
 - Admin token’ı localStorage içinde `modli_admin_session_v1` anahtarıyla saklanır.
 - API çağrıları `X-Admin-Token` header’ı ile backend’e iletilir.
 
+

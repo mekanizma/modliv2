@@ -47,7 +47,11 @@ export default function HomeScreen() {
   const tryOnColorAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadData();
+    // Veri yüklemelerini biraz geciktir - ilk render'ı hızlandır
+    const timer = setTimeout(() => {
+      loadData();
+    }, 100); // 100ms gecikme ile ilk render'ı hızlandır
+    return () => clearTimeout(timer);
   }, []);
 
   // KOMBİN DENE butonu animasyonları
@@ -279,7 +283,7 @@ export default function HomeScreen() {
       // Android için accuracy ve timeout belirt
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-        timeout: 15000, // 15 saniye timeout
+        timeout: 8000, // 8 saniye timeout (hızlı yükleme için)
         maximumAge: 60000, // 1 dakika cache
       });
       
@@ -293,7 +297,7 @@ export default function HomeScreen() {
 
       const response = await axios.get(
         `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${OPENWEATHER_API_KEY}&units=metric&lang=${language}`,
-        { timeout: 10000 }
+        { timeout: 5000 } // 5 saniye timeout (hızlı yükleme için)
       );
 
       const data = response.data;

@@ -34,6 +34,7 @@ SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'modli-admin-secret-token-change-in-production')
 EXPO_ACCESS_TOKEN = os.environ.get('EXPO_ACCESS_TOKEN', '')
 PUSH_TOKEN_TABLE = os.environ.get('PUSH_TOKEN_TABLE', 'push_tokens')
+APP_LOGO_URL = os.environ.get('APP_LOGO_URL', '')  # Modli logo URL'i (Supabase storage veya public URL)
 
 # Admin Credentials
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'modli@mekanizma.com')
@@ -109,9 +110,17 @@ def is_expo_push_token(token: str) -> bool:
     )
 
 
-async def fetch_push_tokens_from_supabase(target_user_id: Optional[str] = None) -> List[str]:
+def is_fcm_token(token: str) -> bool:
+    """Basic validation for FCM tokens (Play Store builds)"""
+    # FCM token'ları genellikle uzun string'lerdir ve belirli bir pattern'e sahiptir
+    # Expo Push API, FCM token'larını da kabul eder, bu yüzden tüm geçerli token'ları kabul edelim
+    return isinstance(token, str) and len(token) > 20 and not token.startswith("ExponentPushToken") and not token.startswith("ExpoPushToken")
+
+
+async def fetch_push_tokens_from_supabase(target_user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Supabase REST üzerinden push token listesini döndürür.
+    Token'ları platform bilgisiyle birlikte döndürür.
     Varsayılan tablo adı: push_tokens (PUSH_TOKEN_TABLE env ile değiştirilebilir)
     """
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -147,35 +156,140 @@ async def fetch_push_tokens_from_supabase(target_user_id: Optional[str] = None) 
     tokens = []
     for row in data:
         token = row.get("push_token")
-        if token and is_expo_push_token(token):
-            tokens.append(token)
-        elif token:
-            logger.warning(f"Geçersiz push token formatı atlandı: {token}")
+        platform = row.get("platform", "unknown")
+        user_id = row.get("user_id")
+        
+        if token:
+            # Hem Expo hem FCM token'larını kabul et
+            # Expo Push API, her iki formatı da destekler
+            tokens.append({
+                "token": token,
+                "platform": platform,
+                "user_id": user_id,
+                "is_expo": is_expo_push_token(token),
+                "is_fcm": is_fcm_token(token)
+            })
+        else:
+            logger.warning(f"Boş push token atlandı: {row}")
 
-    # Benzersiz tut
-    return list(dict.fromkeys(tokens))
+    # Benzersiz tut (token bazında)
+    seen = set()
+    unique_tokens = []
+    for item in tokens:
+        if item["token"] not in seen:
+            seen.add(item["token"])
+            unique_tokens.append(item)
+    
+    return unique_tokens
+
+
+async def log_push_notification(
+    title: str,
+    body: str,
+    target_user_id: Optional[str],
+    sent_count: int,
+    failed_count: int,
+    tokens_info: List[Dict[str, Any]],
+    errors: List[str]
+):
+    """Push notification'ı MongoDB'ye logla"""
+    try:
+        log_entry = {
+            "id": str(uuid.uuid4()),
+            "title": title,
+            "body": body,
+            "target_user_id": target_user_id,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "total_tokens": len(tokens_info),
+            "tokens_info": tokens_info,
+            "errors": errors,
+            "created_at": datetime.utcnow(),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        await db.push_notification_logs.insert_one(log_entry)
+        logger.info(f"Push notification logged: {log_entry['id']}")
+    except Exception as e:
+        logger.error(f"Push notification loglama hatası: {str(e)}")
+
+
+async def get_app_logo_url() -> Optional[str]:
+    """Modli uygulama logosunun URL'ini döndürür"""
+    # Önce environment variable'dan kontrol et
+    if APP_LOGO_URL:
+        return APP_LOGO_URL
+    
+    # Supabase storage'dan logo URL'ini al (eğer varsa)
+    if SUPABASE_URL and SUPABASE_KEY:
+        try:
+            from supabase import create_client, Client
+            supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            
+            # Logo dosyasını storage'dan al (public/logo.png veya benzeri)
+            logo_paths = ["public/modli-logo.png", "public/logo.png", "modli-logo.png"]
+            for path in logo_paths:
+                try:
+                    public_url = supabase.storage.from_("wardrobe").get_public_url(path)
+                    # URL'in geçerli olup olmadığını kontrol et
+                    if public_url and "supabase.co" in public_url:
+                        return public_url
+                except:
+                    continue
+        except Exception as e:
+            logger.warning(f"Logo URL alınamadı: {str(e)}")
+    
+    return None
 
 
 async def send_expo_push_notifications(
-    tokens: List[str], title: str, body: str, data: Optional[Dict[str, Any]] = None
+    tokens_info: List[Dict[str, Any]], title: str, body: str, data: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Expo Push API üzerinden bildirim gönderir.
+    Hem Expo hem FCM token'larını destekler (Expo Push API her ikisini de handle eder).
+    Modli logosu ve ismi ile gönderilir.
     """
-    if not tokens:
+    if not tokens_info:
         return {"sent": [], "failed": [], "errors": ["Kayıtlı push token yok"]}
+    
+    # Logo URL'ini al
+    logo_url = await get_app_logo_url()
 
-    messages = [
-        {
-            "to": token,
+    # Tüm token'ları mesaj formatına çevir (Expo Push API hem Expo hem FCM token'larını kabul eder)
+    # Modli logo ve isim bilgilerini ekle
+    notification_data = {
+        "app_name": "Modli",
+        **(data or {})
+    }
+    
+    messages = []
+    for token_item in tokens_info:
+        if not token_item.get("token"):
+            continue
+            
+        platform = token_item.get("platform", "unknown")
+        message = {
+            "to": token_item["token"],
             "sound": "default",
             "title": title,
             "body": body,
-            "data": data or {},
+            "subtitle": "Modli",  # iOS için alt başlık - "Expo" yerine "Modli" görünecek
+            "data": notification_data,
+            "priority": "default",
         }
-        for token in tokens
-        if is_expo_push_token(token)
-    ]
+        
+        # Android için icon ekle (logo URL'i varsa)
+        if logo_url and platform == "android":
+            message["icon"] = logo_url
+        
+        # Android için channel ID (opsiyonel, daha iyi kontrol için)
+        if platform == "android":
+            message["channelId"] = "default"
+        
+        messages.append(message)
+
+    if not messages:
+        return {"sent": [], "failed": [], "errors": ["Geçerli push token yok"]}
 
     headers = {
         "Content-Type": "application/json",
@@ -195,12 +309,24 @@ async def send_expo_push_notifications(
             except Exception as exc:
                 logger.error(f"Expo push gönderim hatası: {str(exc)}")
                 errors.append(str(exc))
+                # Chunk'taki tüm token'ları failed olarak işaretle
+                for msg in chunk:
+                    failed.append({
+                        "token": msg.get("to"),
+                        "error": str(exc),
+                        "details": None
+                    })
                 continue
 
             if resp.status_code != 200:
                 error_detail = resp.text[:200] if resp.text else "Unknown error"
                 logger.error(f"Expo push API hatası: {resp.status_code} - {error_detail}")
-                failed.extend({"token": msg.get("to"), "error": error_detail} for msg in chunk)
+                for msg in chunk:
+                    failed.append({
+                        "token": msg.get("to"),
+                        "error": error_detail,
+                        "details": None
+                    })
                 continue
 
             resp_json = resp.json()
@@ -1327,13 +1453,25 @@ async def try_on_with_fal(user_image: str, clothing_image: str, http_client: htt
 
 
 @api_router.post("/try-on", response_model=TryOnResponse)
-async def virtual_try_on(request: TryOnRequest):
+async def virtual_try_on(
+    request: TryOnRequest,
+    user = Depends(verify_supabase_user)
+):
     """
     Generate a virtual try-on image using fal.ai
     - All users (including free trial) use fal.ai for best quality
     - Generates 1 image per request
+    - Requires valid Supabase JWT token
     """
     try:
+        # Get authenticated user ID from token
+        authenticated_user_id = user.get("id")
+        
+        # Security check: request.user_id must match token user_id
+        if request.user_id != authenticated_user_id:
+            logger.warning(f"User ID mismatch: token={authenticated_user_id}, request={request.user_id}")
+            raise HTTPException(status_code=403, detail="Forbidden")
+        
         logger.info(f"Try-on request - user: {request.user_id}, category: {request.clothing_category}")
         
         async with httpx.AsyncClient(timeout=300.0) as http_client:
@@ -1348,6 +1486,8 @@ async def virtual_try_on(request: TryOnRequest):
     except httpx.TimeoutException:
         logger.error("Request timed out")
         return TryOnResponse(success=False, error="Request timed out. Please try again.")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Try-on error: {str(e)}")
         return TryOnResponse(success=False, error=str(e))
@@ -1396,13 +1536,23 @@ async def upload_image(
     bucket: str = Form("wardrobe"),
     user_id: str = Form(...),
     filename: Optional[str] = Form(None),
+    user = Depends(verify_supabase_user)
 ):
     """
     Upload image to Supabase Storage and create thumbnail
     Returns URLs for both full and thumbnail images
+    Requires valid Supabase JWT token
     """
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    
+    # Get authenticated user ID from token
+    authenticated_user_id = user.get("id")
+    
+    # Security check: user_id must match token user_id
+    if user_id != authenticated_user_id:
+        logger.warning(f"User ID mismatch: token={authenticated_user_id}, request={user_id}")
+        raise HTTPException(status_code=403, detail="Forbidden")
     
     try:
         from supabase import create_client, Client
@@ -1445,6 +1595,8 @@ async def upload_image(
             thumbnail_url=thumb_url
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
         return ImageUploadResponse(
@@ -1454,13 +1606,25 @@ async def upload_image(
 
 
 @api_router.post("/wardrobe-items")
-async def create_wardrobe_item(item: WardrobeItemCreate):
+async def create_wardrobe_item(
+    item: WardrobeItemCreate,
+    user = Depends(verify_supabase_user)
+):
     """
     Create wardrobe item in Supabase using service role key.
     This bypasses client-side RLS issues and centralizes write logic in the backend.
+    Requires valid Supabase JWT token
     """
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    # Get authenticated user ID from token
+    authenticated_user_id = user.get("id")
+    
+    # Security check: item.user_id must match token user_id
+    if item.user_id != authenticated_user_id:
+        logger.warning(f"User ID mismatch: token={authenticated_user_id}, request={item.user_id}")
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     try:
         payload = {
@@ -1502,18 +1666,32 @@ async def create_wardrobe_item(item: WardrobeItemCreate):
 
         return {"success": True}
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error: {e}")
         raise
 
 @api_router.post("/tryon-results")
-async def create_tryon_result(payload: TryOnResultCreate):
+async def create_tryon_result(
+    payload: TryOnResultCreate,
+    user = Depends(verify_supabase_user)
+):
     """
     Save try-on result image to Supabase Storage and record URL in try_on_results table.
     Frontend sadece URL kullanacak, base64 DB'de tutulmayacak.
+    Requires valid Supabase JWT token
     """
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    # Get authenticated user ID from token
+    authenticated_user_id = user.get("id")
+    
+    # Security check: payload.user_id must match token user_id
+    if payload.user_id != authenticated_user_id:
+        logger.warning(f"User ID mismatch: token={authenticated_user_id}, request={payload.user_id}")
+        raise HTTPException(status_code=403, detail="Forbidden")
 
     try:
         image_url = payload.result_image_url
@@ -1597,6 +1775,49 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password"""
     return pwd_context.hash(password)
+
+async def verify_supabase_user(authorization: str = Header(None)):
+    """
+    Verify Supabase JWT token and return user info.
+    Raises HTTPException if token is invalid.
+    """
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization format")
+    
+    token = authorization.replace("Bearer ", "")
+    
+    if not SUPABASE_URL or not SUPABASE_ANON_KEY:
+        raise HTTPException(status_code=500, detail="Supabase authentication not configured")
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{SUPABASE_URL.rstrip('/')}/auth/v1/user",
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "apikey": SUPABASE_ANON_KEY
+                }
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"Invalid Supabase token: {response.status_code}")
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            
+            user_data = response.json()
+            return user_data
+            
+    except httpx.RequestError as e:
+        logger.error(f"Supabase auth error: {str(e)}")
+        raise HTTPException(status_code=503, detail="Authentication service unavailable")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected auth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication error")
+
 
 async def verify_admin_session(x_admin_token: str = Header(None, alias="X-Admin-Token")):
     """Verify admin session token - Geçici olarak devre dışı"""
@@ -1965,16 +2186,39 @@ async def send_notification(request: NotificationRequest, session: dict = Depend
             f"Admin notification request from {session.get('email')}: title={request.title}, body={request.body}, user_id={request.user_id}"
         )
 
-        tokens = await fetch_push_tokens_from_supabase(request.user_id)
+        tokens_info = await fetch_push_tokens_from_supabase(request.user_id)
 
-        if not tokens:
+        if not tokens_info:
             raise HTTPException(status_code=404, detail="Gönderilecek push token bulunamadı")
 
-        result = await send_expo_push_notifications(tokens, request.title, request.body, request.data)
+        # Token bilgilerini log için hazırla
+        tokens_summary = [
+            {
+                "token": item["token"][:20] + "..." if len(item["token"]) > 20 else item["token"],
+                "platform": item.get("platform", "unknown"),
+                "user_id": item.get("user_id"),
+                "is_expo": item.get("is_expo", False),
+                "is_fcm": item.get("is_fcm", False)
+            }
+            for item in tokens_info
+        ]
+
+        result = await send_expo_push_notifications(tokens_info, request.title, request.body, request.data)
 
         sent_count = len(result.get("sent", []))
         failed = result.get("failed", [])
         error_msgs = result.get("errors", [])
+
+        # Push notification'ı logla
+        await log_push_notification(
+            title=request.title,
+            body=request.body,
+            target_user_id=request.user_id,
+            sent_count=sent_count,
+            failed_count=len(failed),
+            tokens_info=tokens_summary,
+            errors=error_msgs
+        )
 
         if failed or error_msgs:
             logger.warning(
@@ -1993,6 +2237,49 @@ async def send_notification(request: NotificationRequest, session: dict = Depend
         raise
     except Exception as e:
         logger.error(f"Admin send notification error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@admin_router.get("/notifications/logs")
+async def get_notification_logs(
+    session: dict = Depends(verify_admin_session),
+    page: int = 1,
+    page_size: int = 20,
+    limit: int = 100
+):
+    """Push notification loglarını getir"""
+    try:
+        page = max(page, 1)
+        page_size = max(min(page_size, 100), 1)
+        limit = max(min(limit, 1000), 1)
+        skip = (page - 1) * page_size
+
+        # MongoDB'den logları getir
+        cursor = db.push_notification_logs.find().sort("created_at", -1).skip(skip).limit(page_size)
+        logs = await cursor.to_list(length=page_size)
+        
+        # Toplam sayıyı al
+        total_count = await db.push_notification_logs.count_documents({})
+
+        # ObjectId'leri string'e çevir
+        for log in logs:
+            if "_id" in log:
+                log["id"] = str(log["_id"])
+                del log["_id"]
+            if "created_at" in log and isinstance(log["created_at"], datetime):
+                log["created_at"] = log["created_at"].isoformat()
+            if "timestamp" in log and isinstance(log["timestamp"], datetime):
+                log["timestamp"] = log["timestamp"].isoformat()
+
+        return {
+            "success": True,
+            "logs": logs,
+            "count": len(logs),
+            "total": total_count,
+            "page": page,
+            "page_size": page_size,
+        }
+    except Exception as e:
+        logger.error(f"Admin get notification logs error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @admin_router.post("/logout")

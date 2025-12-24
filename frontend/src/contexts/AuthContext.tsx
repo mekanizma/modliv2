@@ -44,11 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const oauthInProgressRef = useRef(false);
 
   useEffect(() => {
-    // Timeout mekanizması - 10 saniye sonra loading'i false yap (session yüklenmesi için daha fazla zaman)
+    // Timeout mekanizması - 3 saniye sonra loading'i false yap (hızlı yükleme için)
     const timeoutId = setTimeout(() => {
-      console.warn('⏰ getSession timeout after 10 seconds');
+      console.warn('⏰ getSession timeout after 3 seconds');
       setLoading(false);
-    }, 10000);
+    }, 3000);
 
     // İlk session'ı yükle - SecureStore'dan okur
     supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -75,13 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('✅ Session loaded from storage:', session ? 'Session exists' : 'No session');
       setSession(session);
       setUser(session?.user ?? null);
+      // Loading'i hemen false yap - profile arka planda yüklenecek
+      setLoading(false);
       if (session?.user) {
-        console.log('👤 User found, fetching profile...');
-        fetchProfile(session.user.id);
+        console.log('👤 User found, fetching profile in background...');
+        // Profile'ı arka planda yükle, navigation'ı bloklamasın
+        fetchProfile(session.user.id).catch(console.error);
         setPushRegistered(false);
       } else {
         console.log('👤 No user found, setting loading to false');
-        setLoading(false);
       }
     }).catch((error: any) => {
       clearTimeout(timeoutId);
@@ -112,8 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (session) {
             setSession(session);
             setUser(session.user ?? null);
+            setLoading(false); // Hemen loading'i false yap
             if (session.user) {
-              await fetchProfile(session.user.id);
+              // Profile'ı arka planda yükle
+              fetchProfile(session.user.id).catch(console.error);
             }
           }
           return;
@@ -132,17 +136,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         setSession(session);
         setUser(session?.user ?? null);
+        setLoading(false); // Hemen loading'i false yap
         if (session?.user) {
           // OAuth callback'ten sonra session set edildiğinde oauthInProgress'i false yap
           if (oauthInProgressRef.current) {
             console.log('✅ OAuth callback completed, session set');
             oauthInProgressRef.current = false;
           }
-          await fetchProfile(session.user.id);
-          await requestNotificationPermission();
+          // Profile ve notification'ı arka planda yükle
+          fetchProfile(session.user.id).catch(console.error);
+          requestNotificationPermission().catch(console.error);
         } else {
           setProfile(null);
-          setLoading(false);
         }
       } catch (error: any) {
         console.error('❌ Error in onAuthStateChange:', error);
@@ -169,9 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     const timeoutId = setTimeout(() => {
-      console.warn('⏰ fetchProfile timeout after 10 seconds');
+      console.warn('⏰ fetchProfile timeout after 3 seconds');
       setLoading(false);
-    }, 10000);
+    }, 3000);
 
     try {
       // Get current session to access user email
@@ -244,7 +249,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       clearTimeout(timeoutId);
-      setLoading(false);
+      // Loading'i burada false yapma - zaten yukarıda false yapıldı
+      // Profile yüklenmesi navigation'ı bloklamamalı
     }
   };
 

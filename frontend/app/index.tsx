@@ -11,14 +11,14 @@ export default function Index() {
   const [lastSessionId, setLastSessionId] = useState<string | null>(null);
   const [timeoutReached, setTimeoutReached] = useState(false);
 
-  // Timeout mekanizması - 12 saniye sonra zorla kontrol (session/profile takılı kalırsa)
+  // Timeout mekanizması - 5 saniye sonra zorla kontrol (hızlı yükleme için)
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (hasNavigated) return;
       console.log('⏰ Timeout reached (failsafe), forcing navigation check...');
       setTimeoutReached(true);
       checkNavigation();
-    }, 12000);
+    }, 5000);
 
     return () => clearTimeout(timeout);
   }, [hasNavigated, loading]);
@@ -86,17 +86,11 @@ export default function Index() {
         return;
       }
 
-      // Wait for profile to load (but not indefinitely)
-      // Timeout'a ulaşıldıysa profile olmasa bile devam et
-      if (!profile && !timeoutReached) {
-        console.log('⏳ Waiting for profile to load...');
-        return;
-      }
-
-      // Timeout'a ulaşıldıysa ve profile yoksa, session varsa ana ekrana git
-      // Profile yüklenene kadar bekleyebiliriz
-      if (!profile && timeoutReached) {
-        console.log('⏰ Timeout reached, profile not loaded but session exists → Navigating to main app');
+      // Profile yüklenmesini bekleme - session varsa hemen navigate et
+      // Profile arka planda yüklenecek ve gerektiğinde güncellenecek
+      if (!profile) {
+        console.log('⏳ Profile not loaded yet, but navigating anyway (will load in background)');
+        // Profile yüklenene kadar beklemek yerine hemen navigate et
         setHasNavigated(true);
         setTimeout(() => router.replace('/(tabs)'), 50);
         return;

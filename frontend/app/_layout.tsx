@@ -60,7 +60,7 @@ function CustomSplashScreen({ visible }: { visible: boolean }) {
           <Image
             source={require('../assets/images/modli-logo.png')}
             style={styles.splashLogo}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         </View>
       </View>
@@ -198,10 +198,8 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
         // Native splash screen hatası varsa yok say (custom splash zaten var)
         console.log('Splash screen hide error (ignored):', error.message);
       });
-      // Custom splash'i de kapat
-      setTimeout(() => {
-        onReady();
-      }, 500);
+      // Custom splash'i hemen kapat (delay kaldırıldı)
+      onReady();
     }
   }, [loading, onReady]);
 
@@ -224,6 +222,15 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
 
 export default function RootLayout() {
   const [showCustomSplash, setShowCustomSplash] = useState(true);
+
+  // Native splash screen'i hemen kapat
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      SplashScreen.hideAsync().catch((error) => {
+        console.log('Splash screen hide error (ignored):', error.message);
+      });
+    }
+  }, []);
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -272,8 +279,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   splashLogo: {
-    width: 200,
-    height: 200,
+    width: '100%',
+    height: '100%',
     borderRadius: 100,
   },
 });

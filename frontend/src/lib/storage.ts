@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from './supabase';
 
 export interface UploadResult {
   success: boolean;
@@ -10,6 +11,7 @@ export interface UploadResult {
 /**
  * Upload image to Supabase Storage via backend
  * Returns URLs for both full and thumbnail images
+ * Requires valid Supabase JWT token
  */
 export async function uploadImageToStorage(
   fileUri: string,
@@ -20,6 +22,16 @@ export async function uploadImageToStorage(
 ): Promise<UploadResult> {
   try {
     const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL as string;
+
+    // Get Supabase session token
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      return {
+        success: false,
+        error: 'Authentication required. Please login first.',
+      };
+    }
 
     const formData = new FormData();
     formData.append('file', {
@@ -39,6 +51,7 @@ export async function uploadImageToStorage(
       {
         headers: {
           'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         timeout: 30000, // 30 second timeout
       }
