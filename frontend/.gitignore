@@ -11,7 +11,12 @@ expo-env.d.ts
 
 # Native
 android/
+!android/app/src/main/res/drawable/
+!android/app/src/main/res/drawable/**
 ios/
+# Exception: Keep drawable resources for splash screen
+!android/app/src/main/res/drawable/
+!android/app/src/main/res/drawable/**
 .kotlin/
 *.orig.*
 *.jks
