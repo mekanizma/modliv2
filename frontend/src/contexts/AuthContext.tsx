@@ -534,7 +534,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('📱 OAuth: waiting for deep link callback...');
           console.log('📱 Deep link should be: modli://auth/callback?access_token=...&refresh_token=...');
 
-          // YENİ: 5 saniye sonra session kontrol et
+          // 5 saniye sonra session kontrol et (Android deep link için)
           setTimeout(async () => {
             if (oauthInProgressRef.current) {
               console.log('📱 Checking session after OAuth (5s)...');
@@ -551,10 +551,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 await fetchProfile(currentSession.user.id);
                 await requestNotificationPermission().catch(console.error);
                 
-                // Loading'i en son false yap (profile fetch edildikten sonra)
+                // Loading'i en son false yap
                 setLoading(false);
               } else {
-                console.log('⚠️ No session found after 5s, waiting for deep link...');
+                console.log('⚠️ No session found after 5s, waiting longer...');
               }
             }
           }, 5000);

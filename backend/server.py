@@ -2,6 +2,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form, D
 from fastapi.responses import HTMLResponse, RedirectResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
@@ -454,6 +455,7 @@ async def root():
 
 @app.get("/auth/callback")
 async def oauth_callback(
+    request: Request,
     access_token: str = None,
     refresh_token: str = None,
     type: str = None,
@@ -517,12 +519,116 @@ async def oauth_callback(
     if access_token and refresh_token:
         logger.info(f"OAuth callback successful - redirecting to app")
         
-        # Deep link URL oluştur
-        deep_link = f"modli://auth/callback?access_token={access_token}&refresh_token={refresh_token}&type=oauth"
+        # Normal deep link URL (iOS için)
+        deep_link_ios = f"modli://auth/callback?access_token={access_token}&refresh_token={refresh_token}&type=oauth"
         
-        # HTTP 302 redirect ile deep link'e yönlendir
-        # Mobil işletim sistemleri bu redirect'i yakalayıp uygulamayı açacak
-        return RedirectResponse(url=deep_link, status_code=302)
+        # Android Intent URL - Chrome Custom Tabs'ın desteklediği format
+        # Intent URL formatı: intent://host/path?params#Intent;scheme=SCHEME;package=PACKAGE;end
+        deep_link_android = f"intent://auth/callback?access_token={access_token}&refresh_token={refresh_token}&type=oauth#Intent;scheme=modli;package=com.mekanizma.modli;S.browser_fallback_url=https%3A%2F%2Fmodli.mekanizma.com;end"
+        
+        # Platform detection ile redirect yap
+        html = f"""
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Giriş Başarılı • Modli</title>
+    <style>
+        body {{
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0a;
+            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+        }}
+        .container {{
+            text-align: center;
+            padding: 20px;
+        }}
+        .spinner {{
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top: 3px solid #6366f1;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }}
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+        .manual-open {{
+            display: none;
+            margin-top: 20px;
+        }}
+        .button {{
+            display: inline-block;
+            padding: 12px 24px;
+            background: #6366f1;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-top: 16px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <p id="message">Uygulamaya yönlendiriliyor...</p>
+        <div class="manual-open" id="manual">
+            <p>Uygulama otomatik açılmadıysa:</p>
+            <a href="#" class="button" id="open-btn">Modli'yi Aç</a>
+        </div>
+    </div>
+    <script>
+        (function() {{
+            console.log('OAuth redirect - Platform detection');
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isAndroid = /android/i.test(userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+            
+            console.log('Platform:', isAndroid ? 'Android' : isIOS ? 'iOS' : 'Unknown');
+            
+            let deepLink;
+            if (isAndroid) {{
+                // Android Intent URL
+                deepLink = "{deep_link_android}";
+                console.log('Using Android Intent URL');
+            }} else {{
+                // iOS veya diğer platformlar için normal deep link
+                deepLink = "{deep_link_ios}";
+                console.log('Using iOS deep link');
+            }}
+            
+            console.log('Redirecting to:', deepLink);
+            
+            // Uygulamayı aç
+            window.location.href = deepLink;
+            
+            // 2 saniye sonra manuel açma butonunu göster
+            setTimeout(() => {{
+                document.getElementById('manual').style.display = 'block';
+                document.getElementById('message').textContent = 'Uygulamaya dönün';
+                
+                // Manuel buton için event
+                document.getElementById('open-btn').onclick = (e) => {{
+                    e.preventDefault();
+                    window.location.href = deepLink;
+                }};
+            }}, 2000);
+        }})();
+    </script>
+</body>
+</html>
+        """
+        return HTMLResponse(content=html)
     
     # Token yoksa fallback HTML sayfası
     # Bu durumda token'lar fragment (#) ile gelmiş olabilir
