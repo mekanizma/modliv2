@@ -197,12 +197,6 @@ export default function SignInScreen() {
     }
   };
 
-  // Test amaçlı onboarding'e geri dön
-  const handleBackToOnboarding = async () => {
-    await AsyncStorage.removeItem('hasSeenOnboarding');
-    router.replace('/(onboarding)');
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -215,26 +209,13 @@ export default function SignInScreen() {
         ]}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Test: Back to Onboarding Button */}
-        <View style={styles.testHeader}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={handleBackToOnboarding}
-          >
-            <Ionicons name="arrow-back" size={20} color="#6366f1" />
-            <Text style={styles.backButtonText}>
-              {language === 'en' ? 'Back to Onboarding (Test)' : 'Onboarding\'e Dön (Test)'}
-            </Text>
-          </TouchableOpacity>
-          
-          {/* Language Toggle */}
-          <TouchableOpacity
-            style={styles.langButton}
-            onPress={() => setLanguage(language === 'en' ? 'tr' : 'en')}
-          >
-            <Text style={styles.langText}>{language === 'en' ? 'TR' : 'EN'}</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Language Toggle */}
+        <TouchableOpacity
+          style={styles.langButton}
+          onPress={() => setLanguage(language === 'en' ? 'tr' : 'en')}
+        >
+          <Text style={styles.langText}>{language === 'en' ? 'TR' : 'EN'}</Text>
+        </TouchableOpacity>
 
         {/* Header */}
         <View style={styles.header}>
@@ -368,29 +349,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 24,
   },
-  testHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#1a1a2e',
-    borderWidth: 1,
-    borderColor: '#6366f1',
-    gap: 6,
-  },
-  backButtonText: {
-    color: '#6366f1',
-    fontSize: 12,
-    fontWeight: '500',
-  },
   langButton: {
+    alignSelf: 'flex-end',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
