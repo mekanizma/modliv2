@@ -106,12 +106,13 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
         let refreshToken: string | null = null;
         let type: string | null = null;
         
-        // Intent URL kontrolü (Android)
-        // Format: intent://auth/callback?access_token=...#Intent;scheme=modli;package=...;end
+        // Intent URL kontrolü (Android) - EN ÖNCE KONTROL ET
+        // Format: intent://auth/callback?access_token=XXX&refresh_token=YYY#Intent;scheme=modli;package=...;end
         if (event.url.includes('intent://')) {
           console.log('🔗 Detected Android Intent URL');
+          console.log('🔗 Full Intent URL:', event.url);
           
-          // Intent URL'den token'ları parse et
+          // Intent URL'den query string'i parse et
           // intent://auth/callback?access_token=XXX&refresh_token=YYY#Intent;...
           const intentMatch = event.url.match(/intent:\/\/[^?]*\?([^#]*)/);
           if (intentMatch) {
@@ -126,6 +127,14 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
             console.log('🔗 Parsed tokens from intent - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
           } else {
             console.warn('⚠️ No query string found in intent URL');
+            // Fallback: Tüm URL'den regex ile parse et
+            const accessTokenMatch = event.url.match(/access_token=([^&]*)/);
+            const refreshTokenMatch = event.url.match(/refresh_token=([^&]*)/);
+            if (accessTokenMatch && refreshTokenMatch) {
+              accessToken = decodeURIComponent(accessTokenMatch[1]);
+              refreshToken = decodeURIComponent(refreshTokenMatch[1]);
+              console.log('🔗 Parsed tokens from intent (fallback regex)');
+            }
           }
         }
         // Deep link formatını parse et (modli://auth/callback?access_token=...&refresh_token=...)

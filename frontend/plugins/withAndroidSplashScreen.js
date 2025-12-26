@@ -66,18 +66,16 @@ const withAndroidSplashScreen = (config) => {
         }
 
         // Create splashscreen_logo.xml drawable that references modli_logo
-        // Use layer-list format for Android 12+ splash screen
-        // Logo merkeze yerleştirilmiş, orijinal boyutunda
+        // Android 12+ splash screen için doğrudan bitmap kullanıyoruz
+        // Logo'yu maksimum boyutta göstermek için layer-list yerine doğrudan bitmap kullanıyoruz
         const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Logo merkeze yerleştirilmiş, orijinal boyutunda -->
-    <item android:gravity="center">
-        <bitmap
-            android:src="@drawable/modli_logo"
-            android:gravity="center"
-            android:tileMode="disabled" />
-    </item>
-</layer-list>`;
+<!-- Android 12+ splash screen için logo drawable -->
+<!-- Logo'yu maksimum boyutta göstermek için doğrudan bitmap kullanıyoruz -->
+<bitmap
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/modli_logo"
+    android:gravity="center"
+    android:tileMode="disabled" />`;
 
         const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
         
@@ -144,15 +142,13 @@ const withAndroidSplashScreen = (config) => {
       // Ensure splashscreen_logo.xml exists and is up to date
       const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
       const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Logo merkeze yerleştirilmiş, orijinal boyutunda -->
-    <item android:gravity="center">
-        <bitmap
-            android:src="@drawable/modli_logo"
-            android:gravity="center"
-            android:tileMode="disabled" />
-    </item>
-</layer-list>`;
+<!-- Android 12+ splash screen için logo drawable -->
+<!-- Logo'yu maksimum boyutta göstermek için doğrudan bitmap kullanıyoruz -->
+<bitmap
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/modli_logo"
+    android:gravity="center"
+    android:tileMode="disabled" />`;
       // Always update to ensure correct format
       fs.writeFileSync(drawablePath, drawableContent, 'utf8');
       console.log('[withAndroidSplashScreen] (Manifest hook) Created/Updated splashscreen_logo.xml');

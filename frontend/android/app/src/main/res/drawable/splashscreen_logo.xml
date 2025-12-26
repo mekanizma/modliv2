@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Logo merkeze yerleştirilmiş, orijinal boyutunda -->
-    <!-- Android splash screen için logo merkeze yerleştirilir -->
-    <item android:gravity="center">
-        <bitmap
-            android:src="@drawable/modli_logo"
-            android:gravity="center"
-            android:tileMode="disabled" />
-    </item>
-</layer-list>
+<!-- Android 12+ splash screen için logo drawable -->
+<!-- Logo'yu maksimum boyutta göstermek için doğrudan bitmap kullanıyoruz -->
+<bitmap
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/modli_logo"
+    android:gravity="center"
+    android:tileMode="disabled" />

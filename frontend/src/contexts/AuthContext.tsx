@@ -496,7 +496,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           // Android'de dismiss durumunda session kontrolü yap
           if (Platform.OS === 'android') {
-            // İlk kontrol: 2 saniye sonra (deep link işlenmesi için zaman ver)
+            // İlk kontrol: 2 saniye sonra (deep link işlenmesi için yeterli zaman)
             setTimeout(async () => {
               if (oauthInProgressRef.current) {
                 console.log('📱 Android: Checking session after dismiss (2s)...');
@@ -515,15 +515,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   console.log('⚠️ Android: No session found after 2s, waiting...');
                 }
               }
-            }, 2000);
+            }, 2000); // 1s → 2s (daha güvenilir)
             
             // İkinci kontrol: 5 saniye sonra
             setTimeout(async () => {
               if (oauthInProgressRef.current) {
-                console.log('📱 Android: Checking session after dismiss (5s)...');
+                console.log('📱 Android: Session check after dismiss (5s)...');
                 const { data: { session: currentSession } } = await supabase.auth.getSession();
                 if (currentSession) {
-                  console.log('✅ Android: Session found after dismiss (5s)!');
+                  console.log('✅ Android: Session found on 5s check!');
                   clearTimeout(oauthTimeout);
                   oauthInProgressRef.current = false;
                   
@@ -541,10 +541,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Üçüncü kontrol: 8 saniye sonra (bazı yavaş cihazlar için)
             setTimeout(async () => {
               if (oauthInProgressRef.current) {
-                console.log('📱 Android: Final check after dismiss (8s)...');
+                console.log('📱 Android: Final session check after dismiss (8s)...');
                 const { data: { session: currentSession } } = await supabase.auth.getSession();
                 if (currentSession) {
-                  console.log('✅ Android: Session found on final check (8s)!');
+                  console.log('✅ Android: Session found on final 8s check!');
                   clearTimeout(oauthTimeout);
                   oauthInProgressRef.current = false;
                   
@@ -554,13 +554,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   await requestNotificationPermission().catch(console.error);
                   setLoading(false);
                 } else {
-                  console.log('❌ Android: No session found after 8s, OAuth was cancelled');
+                  console.log('❌ Android: No session found after 8s, OAuth was cancelled or failed');
                   clearTimeout(oauthTimeout);
                   oauthInProgressRef.current = false;
                   setLoading(false);
                 }
               }
-            }, 8000);
+            }, 8000); // YENİ: 8 saniye final check
             
             // Hemen hata döndürme - session kontrolü yapılıyor
             return { error: null };

@@ -693,7 +693,8 @@ async def oauth_callback(
             const isAndroid = /android/i.test(userAgent);
             const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
             
-            console.log('Platform:', isAndroid ? 'Android' : isIOS ? 'iOS' : 'Unknown');
+            console.log('Platform detected:', isAndroid ? 'Android' : isIOS ? 'iOS' : 'Unknown');
+            console.log('User agent:', userAgent);
             
             // Fragment (#) içindeki token'ları kontrol et
             const hash = window.location.hash.substring(1);
@@ -716,11 +717,11 @@ async def oauth_callback(
                 // Platform'a göre deep link oluştur
                 let deepLink;
                 if (isAndroid) {{
-                    // Android Intent URL - fragment mode için de kullan
+                    // Android Intent URL (fragment mode için)
                     deepLink = `intent://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth#Intent;scheme=modli;package=com.mekanizma.modli;S.browser_fallback_url=https%3A%2F%2Fmodli.mekanizma.com;end`;
                     console.log('Using Android Intent URL (fragment mode)');
                 }} else {{
-                    // iOS normal deep link
+                    // iOS normal deep link  
                     deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
                     console.log('Using iOS deep link (fragment mode)');
                 }}
@@ -732,7 +733,7 @@ async def oauth_callback(
                 // Deep link'e yönlendir
                 window.location.href = deepLink;
                 
-                // 2 saniye sonra kontrol et
+                // 2 saniye sonra manuel açma mesajı
                 setTimeout(() => {{
                     document.getElementById('message').textContent = 'Uygulama açılmadıysa lütfen manuel olarak açın.';
                 }}, 2000);
