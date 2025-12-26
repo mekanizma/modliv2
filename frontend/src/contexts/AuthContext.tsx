@@ -345,18 +345,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithOAuth = async (provider: 'google' | 'apple') => {
     setLoading(true);
     oauthInProgressRef.current = true;
-
-    // Maksimum 30 saniye timeout (Android'de deep link işlemesi zaman alabilir)
+    
     const oauthTimeout = setTimeout(() => {
       if (oauthInProgressRef.current) {
-        console.warn('⏰ OAuth timeout after 30 seconds - deep link may still be processing');
+        console.warn('⏰ OAuth timeout after 10 seconds');
         oauthInProgressRef.current = false;
         setLoading(false);
       }
-    }, 30000);
-
+    }, 10000); // 60000'den 10000'e düşür
+    
     try {
-      // Backend HTTPS callback kullan - token'ları alıp modli:// deep link'e yönlendirecek
+      // Backend HTTPS callback kullan - Google OAuth modli:// native deep link'i desteklemiyor
+      // Backend callback sayfası token'ları alıp modli:// deep link'e yönlendirecek
       const redirectUrl = 'https://modli.mekanizma.com/auth/callback';
 
       console.log('🔐 OAuth redirect URL:', redirectUrl, 'Provider:', provider);
@@ -377,58 +377,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error };
       }
 
+      // OAuth URL kontrolü - eğer URL yoksa hata döndür
       if (!data || !data.url) {
         console.error('❌ OAuth URL not received');
         clearTimeout(oauthTimeout);
         oauthInProgressRef.current = false;
         setLoading(false);
-        return {
-          error: {
+        return { 
+          error: { 
             message: 'OAuth URL alınamadı. Lütfen tekrar deneyin.',
             code: 'OAUTH_URL_MISSING'
-          }
+          } 
         };
       }
 
-      console.log('🌐 Opening OAuth URL in browser...');
-
+      // OAuth URL'i tarayıcıda aç
+      console.log('🌐 Opening OAuth URL:', data.url);
+      
       try {
-        // OAuth URL'i tarayıcıda aç (Android: Chrome Custom Tabs, iOS: SFSafariViewController)
+        // Tüm platformlarda openAuthSessionAsync kullan
+        // Backend callback token'ları alıp modli:// deep link'e yönlendirecek
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUrl
         );
 
+        // Type guard ile url property'sine güvenli erişim
         const resultUrl = 'url' in result ? result.url : null;
-        console.log(`📱 OAuth browser result (${Platform.OS}):`, result.type, resultUrl ? 'URL received' : 'No URL');
+        console.log(`📱 OAuth result (${Platform.OS}):`, result.type, resultUrl);
 
         if (result.type === 'success' && resultUrl) {
-          // URL'den token'ları parse et - normalde iOS'ta çalışır
-          console.log('✅ OAuth success - parsing tokens from URL');
+          // URL'den token'ları parse et
           let accessToken: string | null = null;
           let refreshToken: string | null = null;
 
           try {
+            // modli:// deep link formatını kontrol et
             if (resultUrl.includes('modli://')) {
               const urlMatch = resultUrl.match(/modli:\/\/[^?]+\?(.*)/);
               if (urlMatch) {
                 const params = new URLSearchParams(urlMatch[1]);
                 accessToken = params.get('access_token');
                 refreshToken = params.get('refresh_token');
+                // URL decode (URLSearchParams otomatik decode yapar ama emin olmak için)
                 if (accessToken) accessToken = decodeURIComponent(accessToken);
                 if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
+              } else {
+                // Hash formatı
+                const hashMatch = resultUrl.match(/modli:\/\/[^#]+#(.*)/);
+                if (hashMatch) {
+                  const params = new URLSearchParams(hashMatch[1]);
+                  accessToken = params.get('access_token');
+                  refreshToken = params.get('refresh_token');
+                  if (accessToken) accessToken = decodeURIComponent(accessToken);
+                  if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
+                }
               }
             } else {
+              // Normal URL formatı
               const url = new URL(resultUrl);
+              // Hash veya query params'tan token'ları al
               const hash = url.hash.substring(1);
               const params = new URLSearchParams(hash || url.search);
+              
               accessToken = params.get('access_token');
               refreshToken = params.get('refresh_token');
+              // URL decode (URLSearchParams otomatik decode yapar ama emin olmak için)
               if (accessToken) accessToken = decodeURIComponent(accessToken);
               if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
             }
           } catch (parseError) {
             console.error('URL parse error:', parseError);
+            // Alternatif: regex ile parse et
             const accessTokenMatch = resultUrl.match(/access_token=([^&]*)/);
             const refreshTokenMatch = resultUrl.match(/refresh_token=([^&]*)/);
             accessToken = accessTokenMatch ? decodeURIComponent(accessTokenMatch[1]) : null;
@@ -436,6 +456,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           if (accessToken && refreshToken) {
+            // Session'ı set et
             const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
               access_token: accessToken,
               refresh_token: refreshToken,
@@ -448,6 +469,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               return { error: sessionError };
             }
 
+            // Profile'i yükle
             if (sessionData.session?.user) {
               await fetchProfile(sessionData.session.user.id);
               await requestNotificationPermission();
@@ -463,21 +485,147 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { error: { message: 'Token\'lar alınamadı. Lütfen tekrar deneyin.' } };
           }
         } else if (result.type === 'cancel') {
-          console.log('📱 OAuth cancelled by user');
           clearTimeout(oauthTimeout);
           oauthInProgressRef.current = false;
           setLoading(false);
           return { error: { message: 'OAuth işlemi iptal edildi.' } };
-        } else if (result.type === 'dismiss' || result.type === 'locked') {
-          // Android'de dismiss/locked = tarayıcı kapatıldı ama deep link çalışmış olabilir
-          // _layout.tsx'teki Linking listener deep link'i yakalayacak ve session'ı set edecek
-          console.log(`📱 OAuth ${result.type} - waiting for deep link (handled by _layout.tsx)...`);
-          // Timeout devam edecek ve deep link gelirse onAuthStateChange tetiklenecek
-          return { error: null };
+        } else if (result.type === 'dismiss') {
+          // Android'de dismiss durumunda deep link çalışmış olabilir
+          // Session kontrolü yap - eğer session varsa başarılı demektir
+          console.log('📱 OAuth dismissed - checking session (Android workaround)...');
+          
+          // Android'de dismiss durumunda session kontrolü yap
+          if (Platform.OS === 'android') {
+            // İlk kontrol: 2 saniye sonra (deep link işlenmesi için yeterli zaman)
+            setTimeout(async () => {
+              if (oauthInProgressRef.current) {
+                console.log('📱 Android: Checking session after dismiss (2s)...');
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                if (currentSession) {
+                  console.log('✅ Android: Session found after dismiss (2s), OAuth succeeded!');
+                  clearTimeout(oauthTimeout);
+                  oauthInProgressRef.current = false;
+                  
+                  setSession(currentSession);
+                  setUser(currentSession.user);
+                  await fetchProfile(currentSession.user.id);
+                  await requestNotificationPermission().catch(console.error);
+                  setLoading(false);
+                } else {
+                  console.log('⚠️ Android: No session found after 2s, waiting...');
+                }
+              }
+            }, 2000); // 1s → 2s (daha güvenilir)
+            
+            // İkinci kontrol: 5 saniye sonra
+            setTimeout(async () => {
+              if (oauthInProgressRef.current) {
+                console.log('📱 Android: Session check after dismiss (5s)...');
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                if (currentSession) {
+                  console.log('✅ Android: Session found on 5s check!');
+                  clearTimeout(oauthTimeout);
+                  oauthInProgressRef.current = false;
+                  
+                  setSession(currentSession);
+                  setUser(currentSession.user);
+                  await fetchProfile(currentSession.user.id);
+                  await requestNotificationPermission().catch(console.error);
+                  setLoading(false);
+                } else {
+                  console.log('⚠️ Android: No session found after 5s, waiting...');
+                }
+              }
+            }, 5000);
+            
+            // Üçüncü kontrol: 8 saniye sonra (bazı yavaş cihazlar için)
+            setTimeout(async () => {
+              if (oauthInProgressRef.current) {
+                console.log('📱 Android: Final session check after dismiss (8s)...');
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                if (currentSession) {
+                  console.log('✅ Android: Session found on final 8s check!');
+                  clearTimeout(oauthTimeout);
+                  oauthInProgressRef.current = false;
+                  
+                  setSession(currentSession);
+                  setUser(currentSession.user);
+                  await fetchProfile(currentSession.user.id);
+                  await requestNotificationPermission().catch(console.error);
+                  setLoading(false);
+                } else {
+                  console.log('❌ Android: No session found after 8s, OAuth was cancelled or failed');
+                  clearTimeout(oauthTimeout);
+                  oauthInProgressRef.current = false;
+                  setLoading(false);
+                }
+              }
+            }, 8000); // YENİ: 8 saniye final check
+            
+            // Hemen hata döndürme - session kontrolü yapılıyor
+            return { error: null };
+          } else {
+            // iOS'ta dismiss gerçekten iptal demektir
+            console.log('📱 OAuth dismissed by user (iOS)');
+            clearTimeout(oauthTimeout);
+            oauthInProgressRef.current = false;
+            setLoading(false);
+            return { error: { message: 'OAuth işlemi iptal edildi.' } };
+          }
         } else {
-          // Bilinmeyen durum - deep link bekleniyor
-          console.log('📱 OAuth result type:', result.type, '- waiting for deep link callback...');
-          // Timeout devam edecek, deep link _layout.tsx tarafından handle edilecek
+          // Başka durum - deep link bekleniyor
+          console.log('📱 OAuth result type:', result.type);
+          console.log('📱 OAuth: waiting for deep link callback...');
+          console.log('📱 Deep link should be: modli://auth/callback?access_token=...&refresh_token=...');
+
+          // 5 saniye sonra session kontrol et (Android deep link için)
+          setTimeout(async () => {
+            if (oauthInProgressRef.current) {
+              console.log('📱 Checking session after OAuth (5s)...');
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+              if (currentSession) {
+                console.log('✅ Session found after OAuth, updating all UI states...');
+                oauthInProgressRef.current = false;
+                
+                // ÇÖZÜM: State'leri manuel olarak güncelle
+                setSession(currentSession);
+                setUser(currentSession.user);
+                
+                // Profile'i fetch et
+                await fetchProfile(currentSession.user.id);
+                await requestNotificationPermission().catch(console.error);
+                
+                // Loading'i en son false yap
+                setLoading(false);
+              } else {
+                console.log('⚠️ No session found after 5s, waiting longer...');
+              }
+            }
+          }, 5000);
+
+          // 10 saniye timeout ekle (fallback)
+          setTimeout(async () => {
+            if (oauthInProgressRef.current) {
+              console.warn('⚠️ Deep link timeout after 10 seconds, final session check...');
+              
+              // Son bir kez daha session kontrol et
+              const { data: { session: currentSession } } = await supabase.auth.getSession();
+              if (currentSession) {
+                console.log('✅ Session found on final timeout check, updating UI...');
+                
+                setSession(currentSession);
+                setUser(currentSession.user);
+                await fetchProfile(currentSession.user.id);
+                await requestNotificationPermission().catch(console.error);
+              } else {
+                console.error('❌ No session found after 10 seconds - OAuth likely failed');
+              }
+              
+              oauthInProgressRef.current = false;
+              setLoading(false);
+            }
+          }, 10000);
+
           return { error: null };
         }
       } catch (browserError: any) {
