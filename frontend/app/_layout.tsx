@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Slot } from 'expo-router';
+import { Slot, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { LanguageProvider } from '../src/contexts/LanguageContext';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet, View, LogBox, Image, Animated } from 'react-native';
+import { StyleSheet, View, LogBox, Image, Animated, Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useLanguage } from '../src/contexts/LanguageContext';
 import { ensureDailyOutfitReminderScheduled } from '../src/lib/notifications';
@@ -30,6 +30,10 @@ LogBox.ignoreLogs([
 function CustomSplashScreen({ visible }: { visible: boolean }) {
   const fadeAnim = React.useRef(new Animated.Value(1)).current;
   const [shouldRender, setShouldRender] = useState(true);
+  const { width, height } = Dimensions.get('window');
+  
+  // Logo boyutunu ekran boyutuna göre ayarla (ekran genişliğinin %35'i)
+  const logoSize = Math.min(width * 0.35, height * 0.35, 280);
 
   useEffect(() => {
     if (!visible) {
@@ -56,11 +60,11 @@ function CustomSplashScreen({ visible }: { visible: boolean }) {
       pointerEvents={visible ? 'auto' : 'none'}
     >
       <View style={styles.splashContent}>
-        <View style={styles.logoContainer}>
+        <View style={[styles.logoContainer, { width: logoSize, height: logoSize }]}>
           <Image
             source={require('../assets/images/modli-logo.png')}
-            style={styles.splashLogo}
-            resizeMode="cover"
+            style={[styles.splashLogo, { width: logoSize, height: logoSize }]}
+            resizeMode="contain"
           />
         </View>
       </View>
@@ -71,6 +75,7 @@ function CustomSplashScreen({ visible }: { visible: boolean }) {
 function AppBootstrap({ onReady }: { onReady: () => void }) {
   const { user, loading } = useAuth();
   const { language } = useLanguage();
+  const router = useRouter();
 
   useEffect(() => {
     // Deep link listener - OAuth callback'i yakala
@@ -84,13 +89,47 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
         return;
       }
       
+      // OAuth callback deep link'lerini kontrol et - bunlar route değil, sadece callback
+      const isOAuthCallback = event.url.includes('modli://auth/callback') || 
+                              event.url.includes('intent://auth/callback') ||
+                              (event.url.includes('modli://') && event.url.includes('access_token'));
+      
+      if (isOAuthCallback) {
+        console.log('🔐 OAuth callback deep link detected - handling OAuth callback');
+        // Expo Router'ın bu URL'i route olarak yorumlamasını engellemek için
+        // Deep link'i handle ediyoruz ve return ediyoruz
+        // Bu sayede Expo Router bu URL'i route olarak yorumlamayacak
+      }
+      
       try {
         let accessToken: string | null = null;
         let refreshToken: string | null = null;
         let type: string | null = null;
         
+        // Intent URL kontrolü (Android)
+        // Format: intent://auth/callback?access_token=...#Intent;scheme=modli;package=...;end
+        if (event.url.includes('intent://')) {
+          console.log('🔗 Detected Android Intent URL');
+          
+          // Intent URL'den token'ları parse et
+          // intent://auth/callback?access_token=XXX&refresh_token=YYY#Intent;...
+          const intentMatch = event.url.match(/intent:\/\/[^?]*\?([^#]*)/);
+          if (intentMatch) {
+            console.log('🔗 Found query string in intent:', intentMatch[1]);
+            const params = new URLSearchParams(intentMatch[1]);
+            accessToken = params.get('access_token');
+            refreshToken = params.get('refresh_token');
+            type = params.get('type');
+            // URL decode
+            if (accessToken) accessToken = decodeURIComponent(accessToken);
+            if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
+            console.log('🔗 Parsed tokens from intent - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
+          } else {
+            console.warn('⚠️ No query string found in intent URL');
+          }
+        }
         // Deep link formatını parse et (modli://auth/callback?access_token=...&refresh_token=...)
-        if (event.url.includes('modli://')) {
+        else if (event.url.includes('modli://')) {
           console.log('🔗 Detected modli:// deep link');
           
           // modli://auth/callback?access_token=...&refresh_token=... formatı
@@ -101,6 +140,9 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
             accessToken = params.get('access_token');
             refreshToken = params.get('refresh_token');
             type = params.get('type');
+            // URL decode
+            if (accessToken) accessToken = decodeURIComponent(accessToken);
+            if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
             console.log('🔗 Parsed tokens - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
           } else {
             // modli://auth/callback#access_token=...&refresh_token=... formatı (hash)
@@ -111,6 +153,9 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
               accessToken = params.get('access_token');
               refreshToken = params.get('refresh_token');
               type = params.get('type');
+              // URL decode
+              if (accessToken) accessToken = decodeURIComponent(accessToken);
+              if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
               console.log('🔗 Parsed tokens from hash - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
             } else {
               console.warn('⚠️ No query string or hash found in modli:// URL');
@@ -126,6 +171,9 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
             accessToken = params.get('access_token');
             refreshToken = params.get('refresh_token');
             type = params.get('type');
+            // URL decode
+            if (accessToken) accessToken = decodeURIComponent(accessToken);
+            if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
             console.log('🔗 Parsed tokens from HTTPS - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
           } catch (parseError) {
             console.error('❌ URL parse error:', parseError);
@@ -137,34 +185,78 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
             console.log('🔗 Parsed tokens from regex - access_token:', accessToken ? 'found' : 'missing', 'refresh_token:', refreshToken ? 'found' : 'missing');
           }
         } else {
-          console.warn('⚠️ URL does not contain modli:// or auth/callback:', event.url);
+          console.warn('⚠️ URL does not contain modli://, intent:// or auth/callback:', event.url);
         }
         
         // OAuth callback kontrolü
         if (accessToken && refreshToken) {
           console.log('🔐 OAuth callback detected, setting session...');
+          console.log('🔐 Access token length:', accessToken.length);
+          console.log('🔐 Refresh token length:', refreshToken.length);
           
-          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-          
-          if (sessionError) {
-            console.error('❌ Session set error:', sessionError);
-          } else {
-            console.log('✅ Session set successfully');
-            console.log('✅ User ID:', sessionData.session?.user?.id);
-            // onAuthStateChange event'i otomatik tetiklenecek ve AuthContext güncellenecek
-            // Bu sayede loading state'i de otomatik olarak false olacak
+          try {
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+            
+            if (sessionError) {
+              console.error('❌ Session set error:', sessionError);
+              console.error('❌ Error message:', sessionError.message);
+              console.error('❌ Error code:', sessionError.status);
+              // Hata durumunda auth sayfasına yönlendir
+              setTimeout(() => {
+                router.replace('/(auth)');
+              }, 500);
+            } else if (sessionData?.session) {
+              console.log('✅ Session set successfully');
+              console.log('✅ User ID:', sessionData.session.user?.id);
+              console.log('✅ User email:', sessionData.session.user?.email);
+              
+              // OAuth callback başarılı - doğru sayfaya yönlendir
+              // Expo Router'ın "Unmatched Route" hatası vermesini engellemek için
+              // session set edildikten sonra ana sayfaya yönlendir
+              // index.tsx'te profile kontrolü yapılacak ve doğru sayfaya yönlendirilecek
+              setTimeout(() => {
+                console.log('🔄 Redirecting after OAuth success...');
+                router.replace('/');
+              }, 300);
+              
+              // onAuthStateChange event'i otomatik tetiklenecek ve AuthContext güncellenecek
+              // Bu sayede loading state'i de otomatik olarak false olacak
+              return; // Deep link handling tamamlandı, return et
+            } else {
+              console.warn('⚠️ Session set returned no session data');
+              setTimeout(() => {
+                router.replace('/(auth)');
+              }, 500);
+            }
+          } catch (sessionError: any) {
+            console.error('❌ Exception setting session:', sessionError);
+            console.error('❌ Error details:', JSON.stringify(sessionError));
+            setTimeout(() => {
+              router.replace('/(auth)');
+            }, 500);
           }
+          return; // OAuth callback handle edildi, return et
         } else if (type === 'recovery') {
           // Password recovery callback
           console.log('🔐 Password recovery callback detected');
+          return; // Recovery callback handle edildi
+        } else if (isOAuthCallback) {
+          // OAuth callback ama token'lar bulunamadı
+          console.warn('⚠️ OAuth callback detected but no tokens found');
+          console.warn('⚠️ URL:', event.url);
+          setTimeout(() => {
+            router.replace('/(auth)');
+          }, 500);
+          return; // OAuth callback handle edildi (hata ile)
         } else {
           console.warn('⚠️ Deep link received but no tokens found');
           console.warn('⚠️ URL:', event.url);
-          console.warn('⚠️ accessToken:', accessToken);
-          console.warn('⚠️ refreshToken:', refreshToken);
+          console.warn('⚠️ accessToken:', accessToken ? 'exists' : 'missing');
+          console.warn('⚠️ refreshToken:', refreshToken ? 'exists' : 'missing');
+          // OAuth callback değilse, normal deep link olarak işle
         }
       } catch (error) {
         console.error('❌ Deep link parse error:', error);
@@ -270,17 +362,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
   },
   splashLogo: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 100,
+    resizeMode: 'contain',
   },
 });

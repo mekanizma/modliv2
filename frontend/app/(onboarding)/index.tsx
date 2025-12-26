@@ -22,12 +22,12 @@ const { width, height } = Dimensions.get('window');
 const modelImages = [
   {
     id: 'erkek',
-    source: require('../../assets/images/erkek.png'),
+    source: require('../../assets/images/erkek.jpg'),
     name: 'Erkek',
   },
   {
     id: 'kadin',
-    source: require('../../assets/images/kadin.png'),
+    source: require('../../assets/images/kadin.jpg'),
     name: 'Kadın',
   },
 ];
@@ -51,12 +51,12 @@ const getClothingItems = (modelId: string | null) => {
     return [
       {
         id: 'siyah',
-        source: require('../../assets/images/siyah.png'),
+        source: require('../../assets/images/siyah.jpg'),
         name: 'Siyah',
       },
       {
         id: 'kirmizi',
-        source: require('../../assets/images/kirmizi.png'),
+        source: require('../../assets/images/kirmizi.jpg'),
         name: 'Kırmızı',
       },
     ];
@@ -66,17 +66,22 @@ const getClothingItems = (modelId: string | null) => {
 
 // Try-on results mapping (model + clothing combination)
 const getTryOnResult = (modelId: string | null, clothingId: string | null) => {
-  if (modelId === 'erkek' && clothingId === 'tshirte') {
-    return require('../../assets/images/tsirt.png');
-  }
-  if (modelId === 'erkek' && clothingId === 'takime') {
-    return require('../../assets/images/takim.png');
-  }
-  if (modelId === 'kadin' && clothingId === 'kirmizi') {
-    return require('../../assets/images/kirmizik.png');
-  }
-  if (modelId === 'kadin' && clothingId === 'siyah') {
-    return require('../../assets/images/siyahk.png');
+  try {
+    if (modelId === 'erkek' && clothingId === 'tshirte') {
+      return require('../../assets/images/tsirt.jpg');
+    }
+    if (modelId === 'erkek' && clothingId === 'takime') {
+      return require('../../assets/images/takim.jpg');
+    }
+    if (modelId === 'kadin' && clothingId === 'kirmizi') {
+      return require('../../assets/images/kirmizik.jpg');
+    }
+    if (modelId === 'kadin' && clothingId === 'siyah') {
+      return require('../../assets/images/siyahk.jpg');
+    }
+  } catch (error) {
+    console.error('Error loading try-on result image:', error);
+    return null;
   }
   return null;
 };
@@ -88,6 +93,7 @@ export default function OnboardingScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [selectedClothing, setSelectedClothing] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   
@@ -297,7 +303,21 @@ export default function OnboardingScreen() {
                   }}
                   activeOpacity={0.9}
                 >
-                  <Image source={model.source} style={styles.gridImage} />
+                  {!imageErrors[`model-${model.id}`] ? (
+                    <Image 
+                      source={model.source} 
+                      style={styles.gridImage}
+                      onError={(error) => {
+                        console.error('Error loading model image:', model.id, error);
+                        setImageErrors(prev => ({ ...prev, [`model-${model.id}`]: true }));
+                      }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.gridImage, { backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Ionicons name="image-outline" size={40} color="#9ca3af" />
+                    </View>
+                  )}
                   {isSelected && (
                     <Animated.View
                       style={[
@@ -397,7 +417,21 @@ export default function OnboardingScreen() {
                   }}
                   activeOpacity={0.9}
                 >
-                  <Image source={item.source} style={styles.gridImage} />
+                  {!imageErrors[`clothing-${item.id}`] ? (
+                    <Image 
+                      source={item.source} 
+                      style={styles.gridImage}
+                      onError={(error) => {
+                        console.error('Error loading clothing image:', item.id, error);
+                        setImageErrors(prev => ({ ...prev, [`clothing-${item.id}`]: true }));
+                      }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.gridImage, { backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center' }]}>
+                      <Ionicons name="image-outline" size={40} color="#9ca3af" />
+                    </View>
+                  )}
                   {isSelected && (
                     <Animated.View
                       style={[
@@ -450,9 +484,21 @@ export default function OnboardingScreen() {
             },
           ]}
         >
-          {resultSource && (
-            <Image source={resultSource} style={styles.resultImage} />
-          )}
+          {resultSource && !imageErrors[`result-${selectedModel}-${selectedClothing}`] ? (
+            <Image 
+              source={resultSource} 
+              style={styles.resultImage}
+              onError={(error) => {
+                console.error('Error loading result image:', error);
+                setImageErrors(prev => ({ ...prev, [`result-${selectedModel}-${selectedClothing}`]: true }));
+              }}
+              resizeMode="cover"
+            />
+          ) : resultSource ? (
+            <View style={[styles.resultImage, { backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center' }]}>
+              <Ionicons name="image-outline" size={60} color="#9ca3af" />
+            </View>
+          ) : null}
         </Animated.View>
       </ScrollView>
     );

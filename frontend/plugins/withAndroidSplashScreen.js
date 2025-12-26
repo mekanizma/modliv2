@@ -43,9 +43,15 @@ const withAndroidSplashScreen = (config) => {
         console.log('[withAndroidSplashScreen] Source exists:', fs.existsSync(logoSourcePath));
         
         if (fs.existsSync(logoSourcePath)) {
-          // Always copy to ensure it's up to date
+          // Always copy to ensure it's up to date (even if it exists)
           fs.copyFileSync(logoSourcePath, logoDestPath);
           console.log('[withAndroidSplashScreen] ✓ Copied modli_logo.png to drawable directory');
+          
+          // Verify the file was copied correctly
+          if (fs.existsSync(logoDestPath)) {
+            const stats = fs.statSync(logoDestPath);
+            console.log('[withAndroidSplashScreen] ✓ Logo file size:', stats.size, 'bytes');
+          }
         } else {
           console.error('[withAndroidSplashScreen] ✗ ERROR: modli-logo.png not found at', logoSourcePath);
           // Create a fallback empty drawable to prevent build failure
@@ -60,11 +66,18 @@ const withAndroidSplashScreen = (config) => {
         }
 
         // Create splashscreen_logo.xml drawable that references modli_logo
+        // Use layer-list format for Android 12+ splash screen
+        // Logo merkeze yerleştirilmiş, orijinal boyutunda
         const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/modli_logo"
-    android:gravity="center"
-    android:tileMode="disabled" />`;
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Logo merkeze yerleştirilmiş, orijinal boyutunda -->
+    <item android:gravity="center">
+        <bitmap
+            android:src="@drawable/modli_logo"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>`;
 
         const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
         
@@ -117,27 +130,32 @@ const withAndroidSplashScreen = (config) => {
         fs.mkdirSync(drawableDir, { recursive: true });
       }
 
-      // Ensure modli_logo.png exists
+      // Ensure modli_logo.png exists and is up to date
       const projectRoot = config.modRequest.projectRoot;
       const logoSourcePath = path.join(projectRoot, 'assets', 'images', 'modli-logo.png');
       const logoDestPath = path.join(drawableDir, 'modli_logo.png');
       
-      if (fs.existsSync(logoSourcePath) && !fs.existsSync(logoDestPath)) {
+      if (fs.existsSync(logoSourcePath)) {
+        // Always copy to ensure it's up to date
         fs.copyFileSync(logoSourcePath, logoDestPath);
-        console.log('[withAndroidSplashScreen] (Manifest hook) Copied modli_logo.png');
+        console.log('[withAndroidSplashScreen] (Manifest hook) Copied/Updated modli_logo.png');
       }
 
-      // Ensure splashscreen_logo.xml exists
+      // Ensure splashscreen_logo.xml exists and is up to date
       const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
-      if (!fs.existsSync(drawablePath)) {
-        const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/modli_logo"
-    android:gravity="center"
-    android:tileMode="disabled" />`;
-        fs.writeFileSync(drawablePath, drawableContent, 'utf8');
-        console.log('[withAndroidSplashScreen] (Manifest hook) Created splashscreen_logo.xml');
-      }
+      const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Logo merkeze yerleştirilmiş, orijinal boyutunda -->
+    <item android:gravity="center">
+        <bitmap
+            android:src="@drawable/modli_logo"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>`;
+      // Always update to ensure correct format
+      fs.writeFileSync(drawablePath, drawableContent, 'utf8');
+      console.log('[withAndroidSplashScreen] (Manifest hook) Created/Updated splashscreen_logo.xml');
     } catch (error) {
       console.error('[withAndroidSplashScreen] (Manifest hook) Error:', error.message);
     }

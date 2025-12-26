@@ -412,13 +412,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           let refreshToken: string | null = null;
 
           try {
-            const url = new URL(resultUrl);
-            // Hash veya query params'tan token'ları al
-            const hash = url.hash.substring(1);
-            const params = new URLSearchParams(hash || url.search);
-            
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
+            // modli:// deep link formatını kontrol et
+            if (resultUrl.includes('modli://')) {
+              const urlMatch = resultUrl.match(/modli:\/\/[^?]+\?(.*)/);
+              if (urlMatch) {
+                const params = new URLSearchParams(urlMatch[1]);
+                accessToken = params.get('access_token');
+                refreshToken = params.get('refresh_token');
+                // URL decode (URLSearchParams otomatik decode yapar ama emin olmak için)
+                if (accessToken) accessToken = decodeURIComponent(accessToken);
+                if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
+              } else {
+                // Hash formatı
+                const hashMatch = resultUrl.match(/modli:\/\/[^#]+#(.*)/);
+                if (hashMatch) {
+                  const params = new URLSearchParams(hashMatch[1]);
+                  accessToken = params.get('access_token');
+                  refreshToken = params.get('refresh_token');
+                  if (accessToken) accessToken = decodeURIComponent(accessToken);
+                  if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
+                }
+              }
+            } else {
+              // Normal URL formatı
+              const url = new URL(resultUrl);
+              // Hash veya query params'tan token'ları al
+              const hash = url.hash.substring(1);
+              const params = new URLSearchParams(hash || url.search);
+              
+              accessToken = params.get('access_token');
+              refreshToken = params.get('refresh_token');
+              // URL decode (URLSearchParams otomatik decode yapar ama emin olmak için)
+              if (accessToken) accessToken = decodeURIComponent(accessToken);
+              if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
+            }
           } catch (parseError) {
             console.error('URL parse error:', parseError);
             // Alternatif: regex ile parse et
@@ -469,13 +496,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           // Android'de dismiss durumunda session kontrolü yap
           if (Platform.OS === 'android') {
-            // Kısa bir delay sonra session kontrol et (deep link işlenmesi için zaman ver)
+            // İlk kontrol: 2 saniye sonra (deep link işlenmesi için zaman ver)
             setTimeout(async () => {
               if (oauthInProgressRef.current) {
-                console.log('📱 Android: Checking session after dismiss...');
+                console.log('📱 Android: Checking session after dismiss (2s)...');
                 const { data: { session: currentSession } } = await supabase.auth.getSession();
                 if (currentSession) {
-                  console.log('✅ Android: Session found after dismiss, OAuth succeeded!');
+                  console.log('✅ Android: Session found after dismiss (2s), OAuth succeeded!');
                   clearTimeout(oauthTimeout);
                   oauthInProgressRef.current = false;
                   
@@ -485,22 +512,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   await requestNotificationPermission().catch(console.error);
                   setLoading(false);
                 } else {
-                  console.log('⚠️ Android: No session found after dismiss');
-                  // Session yoksa gerçekten iptal edilmiş demektir
-                  clearTimeout(oauthTimeout);
-                  oauthInProgressRef.current = false;
-                  setLoading(false);
+                  console.log('⚠️ Android: No session found after 2s, waiting...');
                 }
               }
-            }, 1000); // 1 saniye bekle - deep link işlenmesi için
+            }, 2000);
             
-            // 5 saniye sonra tekrar kontrol et (fallback)
+            // İkinci kontrol: 5 saniye sonra
             setTimeout(async () => {
               if (oauthInProgressRef.current) {
-                console.log('📱 Android: Final session check after dismiss (5s)...');
+                console.log('📱 Android: Checking session after dismiss (5s)...');
                 const { data: { session: currentSession } } = await supabase.auth.getSession();
                 if (currentSession) {
-                  console.log('✅ Android: Session found on final check!');
+                  console.log('✅ Android: Session found after dismiss (5s)!');
                   clearTimeout(oauthTimeout);
                   oauthInProgressRef.current = false;
                   
@@ -510,13 +533,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   await requestNotificationPermission().catch(console.error);
                   setLoading(false);
                 } else {
-                  console.log('❌ Android: No session found, OAuth was cancelled');
-                  clearTimeout(oauthTimeout);
-                  oauthInProgressRef.current = false;
-                  setLoading(false);
+                  console.log('⚠️ Android: No session found after 5s, waiting...');
                 }
               }
             }, 5000);
+            
+            // Üçüncü kontrol: 8 saniye sonra (bazı yavaş cihazlar için)
+            setTimeout(async () => {
+              if (oauthInProgressRef.current) {
+                console.log('📱 Android: Final check after dismiss (8s)...');
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                if (currentSession) {
+                  console.log('✅ Android: Session found on final check (8s)!');
+                  clearTimeout(oauthTimeout);
+                  oauthInProgressRef.current = false;
+                  
+                  setSession(currentSession);
+                  setUser(currentSession.user);
+                  await fetchProfile(currentSession.user.id);
+                  await requestNotificationPermission().catch(console.error);
+                  setLoading(false);
+                } else {
+                  console.log('❌ Android: No session found after 8s, OAuth was cancelled');
+                  clearTimeout(oauthTimeout);
+                  oauthInProgressRef.current = false;
+                  setLoading(false);
+                }
+              }
+            }, 8000);
             
             // Hemen hata döndürme - session kontrolü yapılıyor
             return { error: null };

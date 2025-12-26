@@ -684,9 +684,16 @@ async def oauth_callback(
     </div>
     <script>
         (function() {{
-            console.log('OAuth callback page loaded');
+            console.log('OAuth callback page loaded (fragment mode)');
             console.log('URL:', window.location.href);
             console.log('Hash:', window.location.hash);
+            
+            // Platform detection
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isAndroid = /android/i.test(userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+            
+            console.log('Platform:', isAndroid ? 'Android' : isIOS ? 'iOS' : 'Unknown');
             
             // Fragment (#) içindeki token'ları kontrol et
             const hash = window.location.hash.substring(1);
@@ -706,7 +713,18 @@ async def oauth_callback(
             console.log('Refresh token:', refreshToken ? 'found' : 'missing');
             
             if (accessToken && refreshToken) {{
-                const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
+                // Platform'a göre deep link oluştur
+                let deepLink;
+                if (isAndroid) {{
+                    // Android Intent URL - fragment mode için de kullan
+                    deepLink = `intent://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth#Intent;scheme=modli;package=com.mekanizma.modli;S.browser_fallback_url=https%3A%2F%2Fmodli.mekanizma.com;end`;
+                    console.log('Using Android Intent URL (fragment mode)');
+                }} else {{
+                    // iOS normal deep link
+                    deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
+                    console.log('Using iOS deep link (fragment mode)');
+                }}
+                
                 console.log('Redirecting to:', deepLink);
                 
                 document.getElementById('message').textContent = 'Uygulamaya yönlendiriliyor...';

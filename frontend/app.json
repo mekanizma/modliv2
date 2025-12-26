@@ -9,6 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
+      "image": "./assets/images/modli-logo.png",
+      "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "androidStatusBar": {
