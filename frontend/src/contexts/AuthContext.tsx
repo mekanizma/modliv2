@@ -346,13 +346,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     oauthInProgressRef.current = true;
     
+    // Tek bir 30 saniyelik timeout - deep link handler'a güveniyoruz
     const oauthTimeout = setTimeout(() => {
       if (oauthInProgressRef.current) {
-        console.warn('⏰ OAuth timeout after 10 seconds');
+        console.warn('⏰ OAuth timeout after 30 seconds');
         oauthInProgressRef.current = false;
         setLoading(false);
       }
-    }, 10000); // 60000'den 10000'e düşür
+    }, 30000); // 30 saniye - deep link handler için yeterli zaman
     
     try {
       // Backend HTTPS callback kullan - Google OAuth modli:// native deep link'i desteklemiyor
@@ -489,143 +490,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           oauthInProgressRef.current = false;
           setLoading(false);
           return { error: { message: 'OAuth işlemi iptal edildi.' } };
-        } else if (result.type === 'dismiss') {
-          // Android'de dismiss durumunda deep link çalışmış olabilir
-          // Session kontrolü yap - eğer session varsa başarılı demektir
-          console.log('📱 OAuth dismissed - checking session (Android workaround)...');
+        } else if (result.type === 'dismiss' || result.type === 'locked') {
+          // Android'de dismiss/locked durumunda deep link çalışmış olabilir
+          // _layout.tsx'teki deep link handler'a güveniyoruz - hata döndürmüyoruz
+          console.log(`📱 OAuth ${result.type} - waiting for deep link callback...`);
+          console.log('📱 Deep link handler will process the callback automatically');
           
-          // Android'de dismiss durumunda session kontrolü yap
-          if (Platform.OS === 'android') {
-            // İlk kontrol: 2 saniye sonra (deep link işlenmesi için yeterli zaman)
-            setTimeout(async () => {
-              if (oauthInProgressRef.current) {
-                console.log('📱 Android: Checking session after dismiss (2s)...');
-                const { data: { session: currentSession } } = await supabase.auth.getSession();
-                if (currentSession) {
-                  console.log('✅ Android: Session found after dismiss (2s), OAuth succeeded!');
-                  clearTimeout(oauthTimeout);
-                  oauthInProgressRef.current = false;
-                  
-                  setSession(currentSession);
-                  setUser(currentSession.user);
-                  await fetchProfile(currentSession.user.id);
-                  await requestNotificationPermission().catch(console.error);
-                  setLoading(false);
-                } else {
-                  console.log('⚠️ Android: No session found after 2s, waiting...');
-                }
-              }
-            }, 2000); // 1s → 2s (daha güvenilir)
-            
-            // İkinci kontrol: 5 saniye sonra
-            setTimeout(async () => {
-              if (oauthInProgressRef.current) {
-                console.log('📱 Android: Session check after dismiss (5s)...');
-                const { data: { session: currentSession } } = await supabase.auth.getSession();
-                if (currentSession) {
-                  console.log('✅ Android: Session found on 5s check!');
-                  clearTimeout(oauthTimeout);
-                  oauthInProgressRef.current = false;
-                  
-                  setSession(currentSession);
-                  setUser(currentSession.user);
-                  await fetchProfile(currentSession.user.id);
-                  await requestNotificationPermission().catch(console.error);
-                  setLoading(false);
-                } else {
-                  console.log('⚠️ Android: No session found after 5s, waiting...');
-                }
-              }
-            }, 5000);
-            
-            // Üçüncü kontrol: 8 saniye sonra (bazı yavaş cihazlar için)
-            setTimeout(async () => {
-              if (oauthInProgressRef.current) {
-                console.log('📱 Android: Final session check after dismiss (8s)...');
-                const { data: { session: currentSession } } = await supabase.auth.getSession();
-                if (currentSession) {
-                  console.log('✅ Android: Session found on final 8s check!');
-                  clearTimeout(oauthTimeout);
-                  oauthInProgressRef.current = false;
-                  
-                  setSession(currentSession);
-                  setUser(currentSession.user);
-                  await fetchProfile(currentSession.user.id);
-                  await requestNotificationPermission().catch(console.error);
-                  setLoading(false);
-                } else {
-                  console.log('❌ Android: No session found after 8s, OAuth was cancelled or failed');
-                  clearTimeout(oauthTimeout);
-                  oauthInProgressRef.current = false;
-                  setLoading(false);
-                }
-              }
-            }, 8000); // YENİ: 8 saniye final check
-            
-            // Hemen hata döndürme - session kontrolü yapılıyor
-            return { error: null };
-          } else {
-            // iOS'ta dismiss gerçekten iptal demektir
-            console.log('📱 OAuth dismissed by user (iOS)');
-            clearTimeout(oauthTimeout);
-            oauthInProgressRef.current = false;
-            setLoading(false);
-            return { error: { message: 'OAuth işlemi iptal edildi.' } };
-          }
+          // Deep link handler'a güveniyoruz - sadece timeout bekliyoruz
+          // Hata döndürmüyoruz, deep link handler session'ı set edecek
+          return { error: null };
         } else {
           // Başka durum - deep link bekleniyor
           console.log('📱 OAuth result type:', result.type);
           console.log('📱 OAuth: waiting for deep link callback...');
-          console.log('📱 Deep link should be: modli://auth/callback?access_token=...&refresh_token=...');
-
-          // 5 saniye sonra session kontrol et (Android deep link için)
-          setTimeout(async () => {
-            if (oauthInProgressRef.current) {
-              console.log('📱 Checking session after OAuth (5s)...');
-              const { data: { session: currentSession } } = await supabase.auth.getSession();
-              if (currentSession) {
-                console.log('✅ Session found after OAuth, updating all UI states...');
-                oauthInProgressRef.current = false;
-                
-                // ÇÖZÜM: State'leri manuel olarak güncelle
-                setSession(currentSession);
-                setUser(currentSession.user);
-                
-                // Profile'i fetch et
-                await fetchProfile(currentSession.user.id);
-                await requestNotificationPermission().catch(console.error);
-                
-                // Loading'i en son false yap
-                setLoading(false);
-              } else {
-                console.log('⚠️ No session found after 5s, waiting longer...');
-              }
-            }
-          }, 5000);
-
-          // 10 saniye timeout ekle (fallback)
-          setTimeout(async () => {
-            if (oauthInProgressRef.current) {
-              console.warn('⚠️ Deep link timeout after 10 seconds, final session check...');
-              
-              // Son bir kez daha session kontrol et
-              const { data: { session: currentSession } } = await supabase.auth.getSession();
-              if (currentSession) {
-                console.log('✅ Session found on final timeout check, updating UI...');
-                
-                setSession(currentSession);
-                setUser(currentSession.user);
-                await fetchProfile(currentSession.user.id);
-                await requestNotificationPermission().catch(console.error);
-              } else {
-                console.error('❌ No session found after 10 seconds - OAuth likely failed');
-              }
-              
-              oauthInProgressRef.current = false;
-              setLoading(false);
-            }
-          }, 10000);
-
+          console.log('📱 Deep link handler will process the callback automatically');
+          
+          // Deep link handler'a güveniyoruz - sadece timeout bekliyoruz
           return { error: null };
         }
       } catch (browserError: any) {
