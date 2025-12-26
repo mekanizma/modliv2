@@ -66,16 +66,25 @@ const withAndroidSplashScreen = (config) => {
         }
 
         // Create splashscreen_logo.xml drawable that references modli_logo
-        // Android 12+ splash screen için doğrudan bitmap kullanıyoruz
-        // Android otomatik olarak logo'yu container'a sığdırır ve tamamını gösterir
+        // Android 12+ splash screen için layer-list ile explicit boyutlandırma
+        // Logo'nun tamamının görünmesi için container kullanıyoruz
         const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
 <!-- Android 12+ splash screen için logo drawable -->
-<!-- Doğrudan bitmap kullanarak logo'nun tamamını gösteriyoruz -->
-<bitmap
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/modli_logo"
-    android:gravity="center"
-    android:tileMode="disabled" />`;
+<!-- Layer-list ile explicit boyutlandırma - logo'nun tamamı görünsün -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Container: Android 12+ splash screen maksimum 288dp x 288dp alan verir -->
+    <!-- Logo'nun tamamının görünmesi için container'ı kullanıyoruz -->
+    <item
+        android:width="288dp"
+        android:height="288dp"
+        android:gravity="center">
+        <!-- Logo'yu container içinde ortala ve tamamını göster -->
+        <bitmap
+            android:src="@drawable/modli_logo"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>`;
 
         const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
         
@@ -143,12 +152,21 @@ const withAndroidSplashScreen = (config) => {
       const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
       const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
 <!-- Android 12+ splash screen için logo drawable -->
-<!-- Doğrudan bitmap kullanarak logo'nun tamamını gösteriyoruz -->
-<bitmap
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/modli_logo"
-    android:gravity="center"
-    android:tileMode="disabled" />`;
+<!-- Layer-list ile explicit boyutlandırma - logo'nun tamamı görünsün -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Container: Android 12+ splash screen maksimum 288dp x 288dp alan verir -->
+    <!-- Logo'nun tamamının görünmesi için container'ı kullanıyoruz -->
+    <item
+        android:width="288dp"
+        android:height="288dp"
+        android:gravity="center">
+        <!-- Logo'yu container içinde ortala ve tamamını göster -->
+        <bitmap
+            android:src="@drawable/modli_logo"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>`;
       // Always update to ensure correct format
       fs.writeFileSync(drawablePath, drawableContent, 'utf8');
       console.log('[withAndroidSplashScreen] (Manifest hook) Created/Updated splashscreen_logo.xml');

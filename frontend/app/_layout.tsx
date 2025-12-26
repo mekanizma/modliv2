@@ -307,7 +307,7 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     // Uygulama hazır olduğunda splash screen'i kapat
