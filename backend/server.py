@@ -549,6 +549,7 @@ async def oauth_callback(
         .container {{
             text-align: center;
             padding: 20px;
+            max-width: 400px;
         }}
         .spinner {{
             border: 3px solid rgba(99, 102, 241, 0.3);
@@ -564,27 +565,38 @@ async def oauth_callback(
             100% {{ transform: rotate(360deg); }}
         }}
         .manual-open {{
-            display: none;
             margin-top: 20px;
         }}
         .button {{
             display: inline-block;
-            padding: 12px 24px;
+            padding: 16px 32px;
             background: #6366f1;
             color: white;
             text-decoration: none;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-top: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }}
+        .button:active {{
+            transform: scale(0.98);
+        }}
+        #message {{
+            font-size: 16px;
+            margin-bottom: 12px;
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="spinner"></div>
+        <div class="spinner" id="spinner"></div>
         <p id="message">Uygulamaya yönlendiriliyor...</p>
-        <div class="manual-open" id="manual">
+        <div class="manual-open" id="manual" style="display: none;">
             <p>Uygulama otomatik açılmadıysa:</p>
-            <a href="#" class="button" id="open-btn">Modli'yi Aç</a>
+            <button class="button" id="open-btn">Modli'yi Aç</button>
         </div>
     </div>
     <script>
@@ -607,22 +619,43 @@ async def oauth_callback(
                 console.log('Using iOS deep link');
             }}
             
-            console.log('Redirecting to:', deepLink);
+            console.log('Deep link:', deepLink);
             
-            // Uygulamayı aç
-            window.location.href = deepLink;
-            
-            // 2 saniye sonra manuel açma butonunu göster
-            setTimeout(() => {{
-                document.getElementById('manual').style.display = 'block';
-                document.getElementById('message').textContent = 'Uygulamaya dönün';
+            // iOS için otomatik redirect çalışır
+            if (isIOS) {{
+                console.log('iOS detected - attempting automatic redirect');
+                window.location.href = deepLink;
                 
-                // Manuel buton için event
-                document.getElementById('open-btn').onclick = (e) => {{
-                    e.preventDefault();
-                    window.location.href = deepLink;
-                }};
-            }}, 2000);
+                setTimeout(() => {{
+                    document.getElementById('spinner').style.display = 'none';
+                    document.getElementById('manual').style.display = 'block';
+                    document.getElementById('message').textContent = 'Uygulamaya dönün';
+                }}, 1000);
+            }} else {{
+                // Android için MANUEL BUTON ZORUNLU (Chrome Custom Tabs Intent URL restriction)
+                console.log('Android detected - showing manual button');
+                
+                // Spinner'ı kaldır ve butonu göster
+                setTimeout(() => {{
+                    document.getElementById('spinner').style.display = 'none';
+                    document.getElementById('manual').style.display = 'block';
+                    document.getElementById('message').textContent = 'Giriş başarılı!';
+                }}, 500);
+            }}
+            
+            // Manuel buton için event (hem iOS hem Android)
+            document.getElementById('open-btn').onclick = () => {{
+                console.log('Manual button clicked, opening:', deepLink);
+                window.location.href = deepLink;
+                
+                // Buton metnini değiştir
+                document.getElementById('open-btn').textContent = 'Uygulamaya dönün...';
+                
+                setTimeout(() => {{
+                    document.getElementById('message').textContent = 'Uygulamaya geçin';
+                    document.getElementById('open-btn').textContent = 'Tekrar Dene';
+                }}, 2000);
+            }};
         }})();
     </script>
 </body>
@@ -674,6 +707,22 @@ async def oauth_callback(
             color: #f97373;
             margin-top: 20px;
         }}
+        button {{
+            display: inline-block;
+            padding: 16px 32px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            margin-top: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }}
+        button:active {{
+            transform: scale(0.98);
+        }}
     </style>
 </head>
 <body>
@@ -694,7 +743,6 @@ async def oauth_callback(
             const isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
             
             console.log('Platform detected:', isAndroid ? 'Android' : isIOS ? 'iOS' : 'Unknown');
-            console.log('User agent:', userAgent);
             
             // Fragment (#) içindeki token'ları kontrol et
             const hash = window.location.hash.substring(1);
@@ -726,17 +774,53 @@ async def oauth_callback(
                     console.log('Using iOS deep link (fragment mode)');
                 }}
                 
-                console.log('Redirecting to:', deepLink);
+                console.log('Deep link created');
                 
-                document.getElementById('message').textContent = 'Uygulamaya yönlendiriliyor...';
-                
-                // Deep link'e yönlendir
-                window.location.href = deepLink;
-                
-                // 2 saniye sonra manuel açma mesajı
-                setTimeout(() => {{
-                    document.getElementById('message').textContent = 'Uygulama açılmadıysa lütfen manuel olarak açın.';
-                }}, 2000);
+                // iOS için otomatik redirect
+                if (isIOS) {{
+                    console.log('iOS - attempting automatic redirect');
+                    document.getElementById('message').textContent = 'Uygulamaya yönlendiriliyor...';
+                    window.location.href = deepLink;
+                    
+                    setTimeout(() => {{
+                        document.getElementById('message').textContent = 'Uygulamaya dönün';
+                    }}, 1000);
+                }} else {{
+                    // Android - MANUEL BUTON GÖSTER
+                    console.log('Android - showing manual button (Chrome restriction)');
+                    document.getElementById('message').textContent = 'Giriş başarılı! Uygulamayı açın:';
+                    
+                    // Buton ekle
+                    const button = document.createElement('button');
+                    button.textContent = 'Modli\\'yi Aç';
+                    button.style.cssText = `
+                        display: inline-block;
+                        padding: 16px 32px;
+                        background: #6366f1;
+                        color: white;
+                        border: none;
+                        border-radius: 12px;
+                        margin-top: 16px;
+                        font-size: 18px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+                    `;
+                    button.onclick = () => {{
+                        console.log('Button clicked, opening app');
+                        window.location.href = deepLink;
+                        button.textContent = 'Uygulamaya geçin...';
+                        setTimeout(() => {{
+                            button.textContent = 'Tekrar Dene';
+                        }}, 2000);
+                    }};
+                    
+                    document.querySelector('.container').appendChild(button);
+                    
+                    // Spinner'ı gizle
+                    const spinner = document.querySelector('.spinner');
+                    if (spinner) spinner.style.display = 'none';
+                }}
             }} else {{
                 console.error('Tokens not found in hash');
                 document.getElementById('error').style.display = 'block';

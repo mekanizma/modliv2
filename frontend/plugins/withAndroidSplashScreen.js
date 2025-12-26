@@ -67,10 +67,11 @@ const withAndroidSplashScreen = (config) => {
 
         // Create splashscreen_logo.xml drawable that references modli_logo
         // Android 12+ splash screen için doğrudan bitmap kullanıyoruz
-        // Logo'yu maksimum boyutta göstermek için layer-list yerine doğrudan bitmap kullanıyoruz
+        // Android otomatik olarak logo'yu container'a sığdırır ve tamamını gösterir
         const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
 <!-- Android 12+ splash screen için logo drawable -->
-<!-- Logo'yu maksimum boyutta göstermek için doğrudan bitmap kullanıyoruz -->
+<!-- Logo'nun tamamının görünmesi için doğrudan bitmap kullanıyoruz -->
+<!-- Android otomatik olarak logo'yu container'a sığdırır -->
 <bitmap
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:src="@drawable/modli_logo"
@@ -143,7 +144,8 @@ const withAndroidSplashScreen = (config) => {
       const drawablePath = path.join(drawableDir, 'splashscreen_logo.xml');
       const drawableContent = `<?xml version="1.0" encoding="utf-8"?>
 <!-- Android 12+ splash screen için logo drawable -->
-<!-- Logo'yu maksimum boyutta göstermek için doğrudan bitmap kullanıyoruz -->
+<!-- Logo'nun tamamının görünmesi için doğrudan bitmap kullanıyoruz -->
+<!-- Android otomatik olarak logo'yu container'a sığdırır -->
 <bitmap
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:src="@drawable/modli_logo"
