@@ -733,12 +733,8 @@ async def oauth_callback(
             console.log('Tokens:', accessToken ? 'found' : 'missing', refreshToken ? 'found' : 'missing');
             
             if (accessToken && refreshToken) {{
-                let deepLink;
-                if (isAndroid) {{
-                    deepLink = `intent://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth#Intent;scheme=modli;package=com.mekanizma.modli;S.browser_fallback_url=https%3A%2F%2Fmodli.mekanizma.com;end`;
-                }} else {{
-                    deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
-                }}
+                // Tüm platformlar için modli:// kullan
+                const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
                 
                 console.log('Deep link created');
                 
