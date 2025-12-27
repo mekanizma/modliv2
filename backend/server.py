@@ -605,20 +605,29 @@ async def oauth_callback(
             
             console.log('Platform:', isAndroid ? 'Android' : 'iOS');
             
-            let deepLink;
-            if (isAndroid) {{
-                deepLink = "{deep_link_android}";
-                console.log('Using Android Intent URL');
-            }} else {{
-                deepLink = "{deep_link_ios}";
-                console.log('Using iOS deep link');
-            }}
+            // Android'de normal modli:// deep link kullan (intent:// güvenilir değil)
+            // Tüm platformlarda normal modli:// deep link kullan
+            const deepLink = "{deep_link_ios}";
             
-            console.log('Deep link:', deepLink);
+            console.log('Using deep link:', deepLink);
             
-            // Butonu güncelle (<a> tag href kullan - Chrome Custom Tabs için gerekli)
+            // Butonu güncelle
             const btn = document.getElementById('open-btn');
             btn.href = deepLink;
+            
+            // Butona onclick event ekle (ekstra güvenlik için)
+            btn.onclick = function(e) {{
+                e.preventDefault();
+                console.log('Button clicked, opening deep link:', deepLink);
+                // Deep link'i aç
+                window.location.href = deepLink;
+                // Buton metnini güncelle
+                btn.textContent = 'Açılıyor...';
+                // 2 saniye sonra tekrar dene butonu göster
+                setTimeout(() => {{
+                    btn.textContent = 'Tekrar Dene';
+                }}, 2000);
+            }};
             
             // Spinner'ı kaldır ve butonu göster
             setTimeout(() => {{
