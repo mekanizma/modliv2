@@ -575,8 +575,6 @@ async def oauth_callback(
     
     # Token yoksa fallback HTML sayfası
     # Bu durumda token'lar fragment (#) ile gelmiş olabilir (Supabase OAuth'un normal davranışı)
-    # Fragment sunucu tarafında görünmez, ama openAuthSessionAsync bunu görebilir ve app'e döndürür
-    # JavaScript redirect KULLANMIYORUZ - Chrome Custom Tabs session'ı düzgün kapanabilsin
     html = f"""
 <!DOCTYPE html>
 <html lang="tr">
@@ -613,6 +611,25 @@ async def oauth_callback(
         p {{
             color: #9ca3af;
             line-height: 1.6;
+            margin: 8px 0;
+        }}
+        .button {{
+            display: inline-block;
+            padding: 16px 32px;
+            background: #6366f1;
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }}
+        .button:active {{
+            transform: scale(0.98);
+        }}
+        #auto-link {{
+            display: none;
         }}
     </style>
 </head>
@@ -620,15 +637,20 @@ async def oauth_callback(
     <div class="container">
         <div class="success">✓</div>
         <h1>Giriş Başarılı</h1>
-        <p>Uygulamaya dönebilirsiniz.</p>
+        <p id="status">Uygulama açılıyor...</p>
+        <a href="#" id="auto-link">Otomatik Link</a>
+        <a href="#" id="manual-link" class="button" style="display: none;">Modli'yi Aç</a>
     </div>
     <script>
         (function() {{
-            console.log('OAuth callback page loaded');
+            console.log('🌐 OAuth callback page loaded');
 
             const hash = window.location.hash.substring(1);
+            console.log('🔗 Hash:', hash ? 'found' : 'missing');
+
             if (!hash) {{
-                console.error('No hash fragment found');
+                console.error('❌ No hash fragment found');
+                document.getElementById('status').textContent = 'Token bulunamadı. Lütfen tekrar deneyin.';
                 return;
             }}
 
@@ -636,24 +658,81 @@ async def oauth_callback(
             const accessToken = hashParams.get('access_token');
             const refreshToken = hashParams.get('refresh_token');
 
-            console.log('Tokens:', accessToken ? 'found' : 'missing', refreshToken ? 'found' : 'missing');
+            console.log('🔑 Access token:', accessToken ? 'found (' + accessToken.length + ' chars)' : 'missing');
+            console.log('🔑 Refresh token:', refreshToken ? 'found (' + refreshToken.length + ' chars)' : 'missing');
 
-            // Token'lar varsa deep link'i tetikle
-            // Android Chrome Custom Tabs otomatik kapanmadığı için deep link ile app'i açıyoruz
-            // Deep link handler (_layout.tsx) token'ları alıp session'ı başlatacak
             if (accessToken && refreshToken) {{
-                console.log('Tokens found - triggering deep link to open app');
-
                 const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
 
-                console.log('Deep link:', deepLink);
+                console.log('🔗 Deep link created');
+                console.log('🔗 Deep link length:', deepLink.length);
 
-                // Küçük bir delay ile deep link'i tetikle (sayfa yüklenmesini bekle)
-                setTimeout(function() {{
-                    window.location.href = deepLink;
-                }}, 100);
+                // Link'leri ayarla
+                const autoLink = document.getElementById('auto-link');
+                const manualLink = document.getElementById('manual-link');
+
+                autoLink.href = deepLink;
+                manualLink.href = deepLink;
+
+                // Otomatik açma denemeleri
+                let attemptCount = 0;
+                const maxAttempts = 3;
+
+                function attemptOpen() {{
+                    attemptCount++;
+                    console.log('🚀 Attempt', attemptCount, '- Trying to open app...');
+
+                    try {{
+                        // Yöntem 1: Link click
+                        autoLink.click();
+                        console.log('✓ Auto-click executed');
+
+                        // Yöntem 2: window.location (fallback)
+                        setTimeout(function() {{
+                            try {{
+                                console.log('🔄 Trying window.location.href...');
+                                window.location.href = deepLink;
+                            }} catch (e) {{
+                                console.error('❌ window.location.href failed:', e);
+                            }}
+                        }}, 50);
+
+                        // Yöntem 3: iframe trick (fallback)
+                        setTimeout(function() {{
+                            try {{
+                                console.log('🔄 Trying iframe trick...');
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = deepLink;
+                                document.body.appendChild(iframe);
+                                setTimeout(function() {{
+                                    document.body.removeChild(iframe);
+                                }}, 1000);
+                            }} catch (e) {{
+                                console.error('❌ iframe trick failed:', e);
+                            }}
+                        }}, 100);
+
+                    }} catch (e) {{
+                        console.error('❌ Attempt', attemptCount, 'failed:', e);
+                    }}
+
+                    // Retry logic
+                    if (attemptCount < maxAttempts) {{
+                        setTimeout(attemptOpen, 500);
+                    }} else {{
+                        console.log('⚠️ All auto-open attempts completed');
+                        document.getElementById('status').textContent = 'Otomatik açılmadıysa butona tıklayın:';
+                        manualLink.style.display = 'inline-block';
+                    }}
+                }}
+
+                // İlk denemeyi başlat
+                setTimeout(attemptOpen, 100);
+
             }} else {{
-                console.error('Tokens not found in hash');
+                console.error('❌ Tokens not found in hash');
+                document.getElementById('status').textContent = 'Token bulunamadı. Lütfen tekrar deneyin.';
             }}
         }})();
     </script>

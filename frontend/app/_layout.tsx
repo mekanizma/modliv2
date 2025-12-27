@@ -80,22 +80,31 @@ function AppBootstrap({ onReady }: { onReady: () => void }) {
   useEffect(() => {
     // Deep link listener - OAuth callback'i yakala
     const handleDeepLink = async (event: { url: string }) => {
-      console.log('🔗 Deep link received:', event.url);
-      console.log('🔗 Full URL:', JSON.stringify(event.url));
-      
+      console.log('='.repeat(60));
+      console.log('🔗 DEEP LINK RECEIVED');
+      console.log('='.repeat(60));
+      console.log('🔗 URL:', event.url);
+      console.log('🔗 URL length:', event.url.length);
+      console.log('🔗 Timestamp:', new Date().toISOString());
+
       // Expo dev URL'lerini yok say (exp://...)
       if (event.url.startsWith('exp://') || event.url.startsWith('exps://')) {
-        console.log('🔗 Expo dev URL detected, ignoring:', event.url);
+        console.log('🔗 Expo dev URL detected, ignoring');
+        console.log('='.repeat(60));
         return;
       }
-      
+
       // OAuth callback deep link'lerini kontrol et - bunlar route değil, sadece callback
-      const isOAuthCallback = event.url.includes('modli://auth/callback') || 
+      const isOAuthCallback = event.url.includes('modli://auth/callback') ||
                               event.url.includes('intent://auth/callback') ||
                               (event.url.includes('modli://') && event.url.includes('access_token'));
-      
+
+      console.log('🔍 Is OAuth callback?', isOAuthCallback);
+      console.log('🔍 Contains modli://auth/callback?', event.url.includes('modli://auth/callback'));
+      console.log('🔍 Contains access_token?', event.url.includes('access_token'));
+
       if (isOAuthCallback) {
-        console.log('🔐 OAuth callback deep link detected - handling OAuth callback');
+        console.log('✅ OAuth callback deep link detected - handling OAuth callback');
         // Expo Router'ın bu URL'i route olarak yorumlamasını engellemek için
         // Deep link'i handle ediyoruz ve return ediyoruz
         // Bu sayede Expo Router bu URL'i route olarak yorumlamayacak
