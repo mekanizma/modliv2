@@ -427,7 +427,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       try {
         // Tüm platformlarda openAuthSessionAsync kullan
-        // Backend callback token'ları alıp modli:// deep link'e yönlendirecek
+        // Backend callback sayfası yüklendiğinde browser kapanacak ve URL'i (token'larla) döndürecek
+        // Android Chrome Custom Tabs için: URL hash fragment'ında token'lar kalacak
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUrl
@@ -435,7 +436,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Type guard ile url property'sine güvenli erişim
         const resultUrl = 'url' in result ? result.url : null;
-        console.log(`📱 OAuth result (${Platform.OS}):`, result.type, resultUrl);
+        console.log(`📱 OAuth result (${Platform.OS}):`, result.type);
+        console.log(`📱 OAuth result URL:`, resultUrl);
 
         if (result.type === 'success' && resultUrl) {
           // URL'den token'ları parse et
@@ -465,14 +467,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
               }
             } else {
-              // Normal URL formatı
+              // Normal URL formatı (HTTPS callback URL)
+              console.log('🔗 Parsing HTTPS callback URL for tokens');
               const url = new URL(resultUrl);
               // Hash veya query params'tan token'ları al
               const hash = url.hash.substring(1);
+              console.log('🔗 Hash fragment:', hash ? 'found' : 'empty');
+              console.log('🔗 Query string:', url.search ? 'found' : 'empty');
+
               const params = new URLSearchParams(hash || url.search);
-              
+
               accessToken = params.get('access_token');
               refreshToken = params.get('refresh_token');
+              console.log('🔗 Tokens from URL:', accessToken ? 'access_token found' : 'access_token missing', refreshToken ? 'refresh_token found' : 'refresh_token missing');
+
               // URL decode (URLSearchParams otomatik decode yapar ama emin olmak için)
               if (accessToken) accessToken = decodeURIComponent(accessToken);
               if (refreshToken) refreshToken = decodeURIComponent(refreshToken);
