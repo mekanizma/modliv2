@@ -638,11 +638,20 @@ async def oauth_callback(
 
             console.log('Tokens:', accessToken ? 'found' : 'missing', refreshToken ? 'found' : 'missing');
 
-            // Android Chrome Custom Tabs için JavaScript redirect YAPMA
-            // openAuthSessionAsync bu sayfayı görecek, URL'i (hash ile) döndürecek
-            // App token'ları parse edecek
+            // Token'lar varsa deep link'i tetikle
+            // Android Chrome Custom Tabs otomatik kapanmadığı için deep link ile app'i açıyoruz
+            // Deep link handler (_layout.tsx) token'ları alıp session'ı başlatacak
             if (accessToken && refreshToken) {{
-                console.log('Tokens found in hash - page will stay open for openAuthSessionAsync to capture');
+                console.log('Tokens found - triggering deep link to open app');
+
+                const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
+
+                console.log('Deep link:', deepLink);
+
+                // Küçük bir delay ile deep link'i tetikle (sayfa yüklenmesini bekle)
+                setTimeout(function() {{
+                    window.location.href = deepLink;
+                }}, 100);
             }} else {{
                 console.error('Tokens not found in hash');
             }}
