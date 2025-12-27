@@ -515,22 +515,20 @@ async def oauth_callback(
         """
         return HTMLResponse(content=html, status_code=400)
     
-    # Token'lar varsa deep link'e yönlendir
+    # Token'lar varsa başarı sayfası göster
+    # Android Chrome Custom Tabs için token'ları URL'de tutuyoruz (meta refresh yok)
+    # openAuthSessionAsync bu URL'i döndürecek ve app token'ları parse edecek
     if access_token and refresh_token:
-        logger.info(f"OAuth callback successful - redirecting to app")
+        logger.info(f"OAuth callback successful - keeping tokens in URL for app to parse")
 
-        # Deep link URL - Tüm platformlar için aynı format
-        deep_link = f"modli://auth/callback?access_token={access_token}&refresh_token={refresh_token}&type=oauth"
-
-        # HTTP 302 redirect kullan - Chrome Custom Tabs için en güvenilir yöntem
-        # Meta refresh fallback ile birlikte
+        # Token'ları URL'de tut - openAuthSessionAsync bunu döndürecek
+        # Android'de meta refresh kullanmıyoruz çünkü Chrome Custom Tabs session'ı kapatamıyor
         html = f"""
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="0;url={deep_link}" />
     <title>Giriş Başarılı • Modli</title>
     <style>
         body {{
@@ -549,30 +547,26 @@ async def oauth_callback(
             padding: 20px;
             max-width: 400px;
         }}
-        .button {{
-            display: inline-block;
-            padding: 16px 32px;
-            background: #6366f1;
-            color: white;
-            text-decoration: none;
-            border-radius: 12px;
-            margin-top: 16px;
-            font-size: 18px;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        .success {{
+            font-size: 48px;
+            margin-bottom: 20px;
         }}
-        .button:active {{
-            transform: scale(0.98);
+        h1 {{
+            font-size: 24px;
+            margin: 0 0 12px 0;
+            color: #10b981;
+        }}
+        p {{
+            color: #9ca3af;
+            line-height: 1.6;
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <p>Giriş başarılı! Uygulamaya yönlendiriliyorsunuz...</p>
-        <p style="margin-top: 20px; color: #9ca3af; font-size: 14px;">
-            Otomatik olarak açılmazsa:
-        </p>
-        <a href="{deep_link}" class="button">Modli'yi Aç</a>
+        <div class="success">✓</div>
+        <h1>Giriş Başarılı</h1>
+        <p>Uygulamaya dönebilirsiniz.</p>
     </div>
 </body>
 </html>
@@ -580,15 +574,16 @@ async def oauth_callback(
         return HTMLResponse(content=html)
     
     # Token yoksa fallback HTML sayfası
-    # Bu durumda token'lar fragment (#) ile gelmiş olabilir
-    # Fragment sunucu tarafında görünmez, JavaScript ile handle edilmeli
+    # Bu durumda token'lar fragment (#) ile gelmiş olabilir (Supabase OAuth'un normal davranışı)
+    # Fragment sunucu tarafında görünmez, ama openAuthSessionAsync bunu görebilir ve app'e döndürür
+    # JavaScript redirect KULLANMIYORUZ - Chrome Custom Tabs session'ı düzgün kapanabilsin
     html = f"""
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Giriş Yapılıyor • Modli</title>
+    <title>Giriş Başarılı • Modli</title>
     <style>
         body {{
             margin: 0;
@@ -604,110 +599,52 @@ async def oauth_callback(
         .container {{
             text-align: center;
             padding: 20px;
+            max-width: 400px;
         }}
-        .spinner {{
-            border: 3px solid rgba(99, 102, 241, 0.3);
-            border-top: 3px solid #6366f1;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .success {{
+            font-size: 48px;
+            margin-bottom: 20px;
         }}
-        @keyframes spin {{
-            0% {{ transform: rotate(0deg); }}
-            100% {{ transform: rotate(360deg); }}
+        h1 {{
+            font-size: 24px;
+            margin: 0 0 12px 0;
+            color: #10b981;
         }}
-        .error {{
-            display: none;
-            color: #f97373;
-            margin-top: 20px;
-        }}
-        .button {{
-            display: inline-block;
-            padding: 16px 32px;
-            background: #6366f1;
-            color: white;
-            text-decoration: none;
-            border-radius: 12px;
-            margin-top: 16px;
-            font-size: 18px;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-        }}
-        .button:active {{
-            transform: scale(0.98);
+        p {{
+            color: #9ca3af;
+            line-height: 1.6;
         }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="spinner"></div>
-        <p id="message">Giriş yapılıyor...</p>
-        <p class="error" id="error"></p>
+        <div class="success">✓</div>
+        <h1>Giriş Başarılı</h1>
+        <p>Uygulamaya dönebilirsiniz.</p>
     </div>
     <script>
         (function() {{
-            console.log('OAuth callback page loaded (fragment mode)');
-            
-            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            const isAndroid = /android/i.test(userAgent);
-            
-            console.log('Platform:', isAndroid ? 'Android' : 'iOS');
-            
+            console.log('OAuth callback page loaded');
+
             const hash = window.location.hash.substring(1);
             if (!hash) {{
                 console.error('No hash fragment found');
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = 'Token\\'lar bulunamadı.';
-                document.getElementById('message').style.display = 'none';
                 return;
             }}
-            
+
             const hashParams = new URLSearchParams(hash);
             const accessToken = hashParams.get('access_token');
             const refreshToken = hashParams.get('refresh_token');
-            
+
             console.log('Tokens:', accessToken ? 'found' : 'missing', refreshToken ? 'found' : 'missing');
-            
+
+            // Android Chrome Custom Tabs için JavaScript redirect YAPMA
+            // openAuthSessionAsync bu sayfayı görecek, URL'i (hash ile) döndürecek
+            // App token'ları parse edecek
             if (accessToken && refreshToken) {{
-                // Tüm platformlar için modli:// kullan
-                const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
-
-                console.log('Deep link created:', deepLink);
-
-                // Otomatik olarak deep link'i aç (meta refresh yerine JavaScript kullanıyoruz çünkü token'lar fragment'ta)
-                window.location.href = deepLink;
-
-                // Buton ekle - fallback için
-                document.getElementById('message').textContent = 'Giriş başarılı! Uygulamayı açın:';
-                
-                const button = document.createElement('a');
-                button.href = deepLink;
-                button.textContent = 'Modli\\'yi Aç';
-                button.className = 'button';
-                button.style.cssText = `
-                    display: inline-block;
-                    padding: 16px 32px;
-                    background: #6366f1;
-                    color: white;
-                    text-decoration: none;
-                    border-radius: 12px;
-                    margin-top: 16px;
-                    font-size: 18px;
-                    font-weight: 600;
-                    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-                `;
-                
-                document.querySelector('.container').appendChild(button);
-                
-                const spinner = document.querySelector('.spinner');
-                if (spinner) spinner.style.display = 'none';
+                console.log('Tokens found in hash - page will stay open for openAuthSessionAsync to capture');
             }} else {{
-                console.error('Tokens not found');
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = 'Token\\'lar bulunamadı.';
-                document.getElementById('message').style.display = 'none';
+                console.error('Tokens not found in hash');
             }}
         }})();
     </script>
