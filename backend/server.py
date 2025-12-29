@@ -667,19 +667,28 @@ async def oauth_callback(
         <div class="success">✓</div>
         <h1>Giriş Başarılı</h1>
         <p id="status">Uygulama açılıyor...</p>
-        <a href="#" id="auto-link">Otomatik Link</a>
         <a href="#" id="manual-link" class="button" style="display: none;">Modli'yi Aç</a>
+        <div id="debug" style="margin-top: 20px; font-size: 12px; color: #666; word-break: break-all;"></div>
     </div>
     <script>
         (function() {{
-            console.log('🌐 OAuth callback page loaded');
+            const debugDiv = document.getElementById('debug');
+
+            function addDebug(msg) {{
+                console.log(msg);
+                debugDiv.innerHTML += msg + '<br>';
+            }}
+
+            addDebug('🌐 Sayfa yüklendi: ' + new Date().toLocaleTimeString());
+            addDebug('🔗 Tam URL: ' + window.location.href);
 
             const hash = window.location.hash.substring(1);
-            console.log('🔗 Hash:', hash ? 'found' : 'missing');
+            addDebug('🔗 Hash var mı: ' + (hash ? 'EVET (' + hash.length + ' karakter)' : 'HAYIR - SORUN!'));
 
             if (!hash) {{
-                console.error('❌ No hash fragment found');
-                document.getElementById('status').textContent = 'Token bulunamadı. Lütfen tekrar deneyin.';
+                document.getElementById('status').textContent = 'HATA: Token bulunamadı!';
+                addDebug('❌ URL\'de # işaretinden sonra token yok!');
+                addDebug('❌ Supabase redirect çalışmamış olabilir');
                 return;
             }}
 
@@ -687,52 +696,50 @@ async def oauth_callback(
             const accessToken = hashParams.get('access_token');
             const refreshToken = hashParams.get('refresh_token');
 
-            console.log('🔑 Access token:', accessToken ? 'found (' + accessToken.length + ' chars)' : 'missing');
-            console.log('🔑 Refresh token:', refreshToken ? 'found (' + refreshToken.length + ' chars)' : 'missing');
+            addDebug('🔑 Access token: ' + (accessToken ? 'BULUNDU (' + accessToken.length + ' karakter)' : 'BULUNAMADI!'));
+            addDebug('🔑 Refresh token: ' + (refreshToken ? 'BULUNDU (' + refreshToken.length + ' karakter)' : 'BULUNAMADI!'));
 
             if (accessToken && refreshToken) {{
                 const deepLink = `modli://auth/callback?access_token=${{encodeURIComponent(accessToken)}}&refresh_token=${{encodeURIComponent(refreshToken)}}&type=oauth`;
 
-                console.log('🔗 Deep link created');
-                console.log('🔗 Deep link length:', deepLink.length);
+                addDebug('✅ Deep link oluşturuldu (' + deepLink.length + ' karakter)');
+                addDebug('🚀 Uygulamayı açmaya çalışıyor...');
 
-                // Link'leri ayarla
-                const autoLink = document.getElementById('auto-link');
+                // Link'i ayarla
                 const manualLink = document.getElementById('manual-link');
-
-                autoLink.href = deepLink;
                 manualLink.href = deepLink;
 
-                // ANINDA yönlendir - retry yok, direkt aç!
-                console.log('🚀 Opening app immediately...');
-
-                // Metot 1: window.location - EN HIZLI
+                // ANDROID CHROME FIX: iframe kullan
                 try {{
-                    window.location.href = deepLink;
-                    console.log('✅ window.location.href executed');
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = deepLink;
+                    document.body.appendChild(iframe);
+                    addDebug('✅ iframe metodu denendi');
                 }} catch (e) {{
-                    console.error('❌ window.location failed:', e);
+                    addDebug('❌ iframe hatası: ' + e.message);
                 }}
 
-                // Fallback: 100ms sonra link click
+                // Fallback: Link click
                 setTimeout(function() {{
                     try {{
-                        autoLink.click();
-                        console.log('✅ Auto-click executed');
+                        manualLink.click();
+                        addDebug('✅ Link click denendi');
                     }} catch (e) {{
-                        console.error('❌ click failed:', e);
+                        addDebug('❌ Link click hatası: ' + e.message);
                     }}
-                }}, 100);
+                }}, 200);
 
-                // Manuel buton göster (1 saniye sonra)
+                // Manuel butonu göster
                 setTimeout(function() {{
-                    document.getElementById('status').textContent = 'Açılmadıysa butona tıklayın:';
+                    document.getElementById('status').textContent = 'Uygulamayı açmak için butona tıklayın:';
                     manualLink.style.display = 'inline-block';
-                }}, 1000);
+                    addDebug('ℹ️ Manuel buton gösteriliyor - tıklayın!');
+                }}, 500);
 
             }} else {{
-                console.error('❌ Tokens not found in hash');
-                document.getElementById('status').textContent = 'Token bulunamadı. Lütfen tekrar deneyin.';
+                document.getElementById('status').textContent = 'HATA: Token eksik!';
+                addDebug('❌ Access veya refresh token bulunamadı!');
             }}
         }})();
     </script>
