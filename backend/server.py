@@ -703,61 +703,32 @@ async def oauth_callback(
                 autoLink.href = deepLink;
                 manualLink.href = deepLink;
 
-                // Otomatik açma denemeleri
-                let attemptCount = 0;
-                const maxAttempts = 3;
+                // ANINDA yönlendir - retry yok, direkt aç!
+                console.log('🚀 Opening app immediately...');
 
-                function attemptOpen() {{
-                    attemptCount++;
-                    console.log('🚀 Attempt', attemptCount, '- Trying to open app...');
-
-                    try {{
-                        // Yöntem 1: Link click
-                        autoLink.click();
-                        console.log('✓ Auto-click executed');
-
-                        // Yöntem 2: window.location (fallback)
-                        setTimeout(function() {{
-                            try {{
-                                console.log('🔄 Trying window.location.href...');
-                                window.location.href = deepLink;
-                            }} catch (e) {{
-                                console.error('❌ window.location.href failed:', e);
-                            }}
-                        }}, 50);
-
-                        // Yöntem 3: iframe trick (fallback)
-                        setTimeout(function() {{
-                            try {{
-                                console.log('🔄 Trying iframe trick...');
-                                const iframe = document.createElement('iframe');
-                                iframe.style.display = 'none';
-                                iframe.src = deepLink;
-                                document.body.appendChild(iframe);
-                                setTimeout(function() {{
-                                    document.body.removeChild(iframe);
-                                }}, 1000);
-                            }} catch (e) {{
-                                console.error('❌ iframe trick failed:', e);
-                            }}
-                        }}, 100);
-
-                    }} catch (e) {{
-                        console.error('❌ Attempt', attemptCount, 'failed:', e);
-                    }}
-
-                    // Retry logic
-                    if (attemptCount < maxAttempts) {{
-                        setTimeout(attemptOpen, 500);
-                    }} else {{
-                        console.log('⚠️ All auto-open attempts completed');
-                        document.getElementById('status').textContent = 'Otomatik açılmadıysa butona tıklayın:';
-                        manualLink.style.display = 'inline-block';
-                    }}
+                // Metot 1: window.location - EN HIZLI
+                try {{
+                    window.location.href = deepLink;
+                    console.log('✅ window.location.href executed');
+                }} catch (e) {{
+                    console.error('❌ window.location failed:', e);
                 }}
 
-                // İlk denemeyi başlat
-                setTimeout(attemptOpen, 100);
+                // Fallback: 100ms sonra link click
+                setTimeout(function() {{
+                    try {{
+                        autoLink.click();
+                        console.log('✅ Auto-click executed');
+                    }} catch (e) {{
+                        console.error('❌ click failed:', e);
+                    }}
+                }}, 100);
+
+                // Manuel buton göster (1 saniye sonra)
+                setTimeout(function() {{
+                    document.getElementById('status').textContent = 'Açılmadıysa butona tıklayın:';
+                    manualLink.style.display = 'inline-block';
+                }}, 1000);
 
             }} else {{
                 console.error('❌ Tokens not found in hash');

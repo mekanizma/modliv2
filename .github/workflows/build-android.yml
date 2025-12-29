@@ -1,0 +1,90 @@
+name: Build Android APK (Production)
+
+on:
+  push:
+    branches:
+      - claude/fix-google-login-android-9KMhG
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🔧 Setup Expo
+        run: npx expo install --fix
+
+      - name: 🏗️ Prebuild Android (Production)
+        run: npx expo prebuild --platform android --clean
+        env:
+          EXPO_PUBLIC_BACKEND_URL: https://modli.mekanizma.com
+          EXPO_PUBLIC_SUPABASE_URL: https://cgbyhxployzpxwixgqzs.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNnYnloeHBsb3l6cHh3aXhncXpzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4OTI4NjIsImV4cCI6MjA4MTQ2ODg2Mn0.oX3Xlf4niVoAUT5mreZ2sSm9wVUbiVJp2m2jzNnTrS8
+
+      - name: 🔑 Make Gradle executable
+        working-directory: frontend/android
+        run: chmod +x ./gradlew
+
+      - name: 🏭 Build Release APK
+        working-directory: frontend/android
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: 📝 Rename APK
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/modli-release-${{ github.run_number }}.apk
+
+      - name: 📤 Upload Production APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: modli-production-${{ github.run_number }}
+          path: frontend/android/app/build/outputs/apk/release/modli-release-${{ github.run_number }}.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: 📤 Upload Original APK (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-unsigned
+          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: 📊 Build Summary
+        if: success()
+        run: |
+          echo "✅ Production APK Build Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📱 **Download Production APK:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Go to Actions tab" >> $GITHUB_STEP_SUMMARY
+          echo "- Click on this workflow run" >> $GITHUB_STEP_SUMMARY
+          echo "- Download 'modli-production-${{ github.run_number }}' artifact" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔧 **Build Type:** Release (Production)" >> $GITHUB_STEP_SUMMARY
+          echo "📦 **APK:** modli-release-${{ github.run_number }}.apk" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Note:** This APK is signed with debug keystore" >> $GITHUB_STEP_SUMMARY
+          echo "For Play Store upload, use a proper release keystore" >> $GITHUB_STEP_SUMMARY
+
+
