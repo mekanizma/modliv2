@@ -372,6 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     oauthInProgressRef.current = true;
 
     try {
+<<<<<<< HEAD
       // EXPO AUTHSESSION ile düzgün redirect URL oluştur
       const redirectUrl = AuthSession.makeRedirectUri({
         scheme: 'modli',
@@ -380,13 +381,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log('🔐 AuthSession redirect URL:', redirectUrl);
       console.log('🔐 Provider:', provider);
+=======
+      // iOS tarafında mevcut backend HTTPS callback akışını bozma
+      // Android tarafında ise doğrudan native deep link (modli://auth/callback) kullan
+      const redirectUrl =
+        Platform.OS === 'android'
+          ? 'modli://auth/callback'
+          : 'https://modli.mekanizma.com/auth/callback';
+
+      console.log('🔐 OAuth redirect URL:', redirectUrl, 'Provider:', provider, 'Platform:', Platform.OS);
+>>>>>>> 34d821b (Fix fal.ai try-on params and Android OAuth redirect)
 
       // Supabase OAuth URL'ini al
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
+          // skipBrowserRedirect: false - Supabase otomatik handle etsin
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -413,61 +424,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
 
       console.log('🔍 WebBrowser result type:', result.type);
-      console.log('🔍 WebBrowser result:', JSON.stringify(result, null, 2));
 
       if (result.type === 'success') {
-        console.log('✅ OAuth success! URL:', result.url);
+        console.log('✅ OAuth success! Redirect URL:', result.url);
 
-        // URL'den token'ları parse et
-        const url = result.url;
-        let accessToken: string | null = null;
-        let refreshToken: string | null = null;
+        // Supabase auth listener otomatik session set edecek
+        // Sadece başarılı olduğunu bildir
+        console.log('✅ Waiting for Supabase to set session...');
 
-        // Hash veya query string'den parse et
-        try {
-          const urlObj = new URL(url);
-          const hash = urlObj.hash.substring(1);
-          const params = new URLSearchParams(hash || urlObj.search);
-
-          accessToken = params.get('access_token');
-          refreshToken = params.get('refresh_token');
-
-          console.log('🔑 Parsed tokens - access:', accessToken ? 'YES' : 'NO', 'refresh:', refreshToken ? 'YES' : 'NO');
-        } catch (parseError) {
-          console.error('❌ URL parse error:', parseError);
-
-          // Fallback: regex
-          const accessMatch = url.match(/access_token=([^&]*)/);
-          const refreshMatch = url.match(/refresh_token=([^&]*)/);
-          accessToken = accessMatch ? decodeURIComponent(accessMatch[1]) : null;
-          refreshToken = refreshMatch ? decodeURIComponent(refreshMatch[1]) : null;
-        }
-
-        if (accessToken && refreshToken) {
-          console.log('🔐 Setting session with tokens...');
-
-          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-
-          if (sessionError) {
-            console.error('❌ setSession error:', sessionError);
-            oauthInProgressRef.current = false;
-            setLoading(false);
-            return { error: sessionError };
-          }
-
-          console.log('✅ Session set successfully!');
-          oauthInProgressRef.current = false;
-          setLoading(false);
-          return { error: null };
-        } else {
-          console.error('❌ Tokens not found in URL');
-          oauthInProgressRef.current = false;
-          setLoading(false);
-          return { error: { message: 'Token bulunamadı' } };
-        }
+        // Loading durumunu kapatma - auth listener halledecek
+        // oauthInProgressRef.current = false olacak SIGNED_IN event'inde
+        return { error: null };
       } else if (result.type === 'cancel') {
         console.log('⚠️ User cancelled OAuth');
         oauthInProgressRef.current = false;

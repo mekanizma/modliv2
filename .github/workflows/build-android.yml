@@ -47,6 +47,11 @@ jobs:
         working-directory: frontend/android
         run: chmod +x ./gradlew
 
+      - name: 🔐 Get debug keystore SHA1/SHA256
+        run: |
+          echo "Debug Keystore Fingerprints:"
+          keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -A 2 "Certificate fingerprints" || echo "Debug keystore not found"
+
       - name: 🧹 Clean build directory
         working-directory: frontend/android
         run: ./gradlew clean

@@ -1647,6 +1647,8 @@ async def try_on_with_fal(user_image: str, clothing_image: str, http_client: htt
             "preserve_pose": True,           # Keep body pose unchanged
             "preserve_face": True,           # Keep face unchanged
             "preserve_background": True,     # Keep background unchanged
+            # Output ratio - always square for consistent UI crops
+            "ratio": "1:1",
             # Quality settings - optimized for speed/quality balance
             "num_images": 1,
             "num_inference_steps": 30,       # Balanced: 30 steps (was 50, too slow)
